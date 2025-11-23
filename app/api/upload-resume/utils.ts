@@ -1,4 +1,4 @@
-import pdfParse from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 
 // Maximum file size: 10MB
@@ -61,8 +61,9 @@ export function isPdfFile(file: File): boolean {
  */
 export async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
-    const data = await pdfParse(buffer);
-    return data.text || '';
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    return result.text || '';
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new Error(`Failed to parse PDF: ${message}`);
@@ -123,9 +124,11 @@ export function cleanJsonResponse(response: string): string {
 }
 
 /**
- * Interface for the skills extraction response from Gemini
+ * Interface for the resume extraction response from Gemini
  */
-export interface SkillsExtractionResult {
+export interface ResumeExtractionResult {
+  name: string;
+  email: string;
   skills: string[];
   summary: string;
 }
@@ -136,6 +139,8 @@ export interface SkillsExtractionResult {
 export interface ResumeProcessingResult {
   success: boolean;
   rawText: string;
+  name: string;
+  email: string;
   skills: string[];
   summary: string;
   embedding: number[];

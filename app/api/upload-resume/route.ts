@@ -4,7 +4,7 @@ import {
   validateFile,
   extractTextFromFile,
   cleanJsonResponse,
-  type SkillsExtractionResult,
+  type ResumeExtractionResult,
   type ResumeProcessingResult,
 } from './utils';
 
@@ -21,14 +21,22 @@ export const config = {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 /**
- * Extracts skills and summary from resume text using Gemini
+ * Extracts name, email, skills, and summary from resume text using Gemini
  */
-async function extractSkillsWithGemini(
+async function extractResumeDataWithGemini(
   resumeText: string
-): Promise<SkillsExtractionResult> {
+): Promise<ResumeExtractionResult> {
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-  const prompt = `Extract exactly 6–12 skills or keywords from the resume text below. Return JSON only in the form: { "skills": string[], "summary": string }. The summary should be a 2-3 sentence professional overview of the candidate. Here is the resume text:
+  const prompt = `Extract the following from the resume text below and return JSON only in this exact form:
+{
+  "name": "Full name of the candidate",
+  "email": "Email address (or empty string if not found)",
+  "skills": ["Array of 6-12 relevant skills or keywords"],
+  "summary": "A 2-3 sentence professional overview of the candidate"
+}
+
+Here is the resume text:
 
 ${resumeText}`;
 
@@ -39,9 +47,15 @@ ${resumeText}`;
   const cleanedResponse = cleanJsonResponse(responseText);
 
   try {
-    const parsed = JSON.parse(cleanedResponse) as SkillsExtractionResult;
+    const parsed = JSON.parse(cleanedResponse) as ResumeExtractionResult;
 
     // Validate the response structure
+    if (typeof parsed.name !== 'string') {
+      throw new Error('Invalid response: name must be a string');
+    }
+    if (typeof parsed.email !== 'string') {
+      throw new Error('Invalid response: email must be a string');
+    }
     if (!Array.isArray(parsed.skills)) {
       throw new Error('Invalid response: skills must be an array');
     }
@@ -61,9 +75,9 @@ ${resumeText}`;
 
     return parsed;
   } catch (error) {
-    console.error('Failed to parse Gemini skills response:', responseText);
+    console.error('Failed to parse Gemini response:', responseText);
     throw new Error(
-      `Failed to parse skills extraction response: ${error instanceof Error ? error.message : 'Invalid JSON'}`
+      `Failed to parse resume extraction response: ${error instanceof Error ? error.message : 'Invalid JSON'}`
     );
   }
 }
@@ -164,10 +178,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract skills and summary using Gemini
-    let skillsResult: SkillsExtractionResult;
+    // Extract name, email, skills, and summary using Gemini
+    let extractionResult: ResumeExtractionResult;
     try {
-      skillsResult = await extractSkillsWithGemini(rawText);
+      extractionResult = await extractResumeDataWithGemini(rawText);
     } catch (error) {
       console.error('Gemini skills extraction error:', error);
       return NextResponse.json(
@@ -185,8 +199,8 @@ export async function POST(request: NextRequest) {
     let embedding: number[];
     try {
       embedding = await generateEmbedding(
-        skillsResult.summary,
-        skillsResult.skills
+        extractionResult.summary,
+        extractionResult.skills
       );
     } catch (error) {
       console.error('Embedding generation error:', error);
@@ -205,8 +219,10 @@ export async function POST(request: NextRequest) {
     const result: ResumeProcessingResult = {
       success: true,
       rawText,
-      skills: skillsResult.skills,
-      summary: skillsResult.summary,
+      name: extractionResult.name,
+      email: extractionResult.email,
+      skills: extractionResult.skills,
+      summary: extractionResult.summary,
       embedding,
     };
 
