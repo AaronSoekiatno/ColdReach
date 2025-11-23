@@ -15,7 +15,26 @@ N::Startup {
     funding_stage: String,
     funding_amount: String,
     location: String,
+    website: String,
+    tags: String,
     embedding: [F64],
+}
+
+// FundingRound - represents a funding round for a startup
+N::FundingRound {
+    INDEX id: String,
+    stage: String,
+    amount: String,
+    date_raised: String,
+    batch: String,
+}
+
+// Founder - represents a founder of a startup
+N::Founder {
+    INDEX email: String,
+    first_name: String,
+    last_name: String,
+    linkedin: String,
 }
 
 // Edge connecting a candidate to matched startups
@@ -26,4 +45,16 @@ E::MatchedTo {
         score: F64,
         matched_at: String,
     }
+}
+
+// Edge connecting a startup to its founders
+E::HasFounder {
+    From: Startup,
+    To: Founder,
+}
+
+// Edge connecting a startup to its funding rounds
+E::HasFundingRound {
+    From: Startup,
+    To: FundingRound,
 }

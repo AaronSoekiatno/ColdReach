@@ -19,7 +19,7 @@ QUERY GetCandidateByEmail(email: String) =>
 // ==================== STARTUP QUERIES ====================
 
 // Add a new startup to the database
-QUERY AddStartup(name: String, industry: String, description: String, funding_stage: String, funding_amount: String, location: String, embedding: [F64]) =>
+QUERY AddStartup(name: String, industry: String, description: String, funding_stage: String, funding_amount: String, location: String, website: String, tags: String, embedding: [F64]) =>
     startup <- AddN<Startup>({
         name: name,
         industry: industry,
@@ -27,6 +27,8 @@ QUERY AddStartup(name: String, industry: String, description: String, funding_st
         funding_stage: funding_stage,
         funding_amount: funding_amount,
         location: location,
+        website: website,
+        tags: tags,
         embedding: embedding
     })
     RETURN startup
@@ -35,6 +37,63 @@ QUERY AddStartup(name: String, industry: String, description: String, funding_st
 QUERY GetAllStartups() =>
     startups <- N<Startup>
     RETURN startups
+
+// ==================== FUNDING ROUND QUERIES ====================
+
+// Add a new funding round
+QUERY AddFundingRound(id: String, stage: String, amount: String, date_raised: String, batch: String) =>
+    funding_round <- AddN<FundingRound>({
+        id: id,
+        stage: stage,
+        amount: amount,
+        date_raised: date_raised,
+        batch: batch
+    })
+    RETURN funding_round
+
+// Get funding round by ID
+QUERY GetFundingRoundById(id: String) =>
+    funding_round <- N<FundingRound>({id: id})
+    RETURN funding_round
+
+// ==================== FOUNDER QUERIES ====================
+
+// Add a new founder
+QUERY AddFounder(email: String, first_name: String, last_name: String, linkedin: String) =>
+    founder <- AddN<Founder>({
+        email: email,
+        first_name: first_name,
+        last_name: last_name,
+        linkedin: linkedin
+    })
+    RETURN founder
+
+// Get founder by email
+QUERY GetFounderByEmail(email: String) =>
+    founder <- N<Founder>({email: email})
+    RETURN founder
+
+// ==================== RELATIONSHIP QUERIES ====================
+
+// Connect a startup to a founder
+QUERY ConnectStartupToFounder(startup_name: String, founder_email: String) =>
+    startup <- N<Startup>({name: startup_name})
+    founder <- N<Founder>({email: founder_email})
+    edge <- AddE<HasFounder>({
+        from: startup,
+        to: founder
+    })
+    RETURN edge
+
+// Connect a startup to a funding round
+QUERY ConnectStartupToFundingRound(startup_name: String, funding_round_id: String) =>
+    startup <- N<Startup>({name: startup_name})
+    funding_round <- N<FundingRound>({id: funding_round_id})
+    edge <- AddE<HasFundingRound>({
+        from: startup,
+        to: funding_round
+    })
+    RETURN edge
 
 // ==================== MATCHING QUERIES ====================
 
