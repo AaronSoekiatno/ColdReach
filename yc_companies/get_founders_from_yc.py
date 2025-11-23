@@ -86,3 +86,4 @@ if __name__ == "__main__":
     pattern_companies, all_companies, csv_file, fieldnames = main()
     print(f"\n✅ Ready to extract founder data for {len(pattern_companies)} companies")
 
+

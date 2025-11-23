@@ -1,5 +1,20 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Prerequisites
+
+This project uses [Helix](https://helix.dev) database, which requires GLIBC 2.39. If you're using WSL with Ubuntu 22.04 or earlier, you'll need to upgrade.
+
+### Fixing GLIBC 2.39 Requirement
+
+**Option 1: Upgrade WSL to Ubuntu 24.10+ (Recommended)**
+```bash
+# In WSL, upgrade to Ubuntu 24.10
+sudo do-release-upgrade
+```
+
+**Option 2: Use Docker for Helix**
+If upgrading isn't possible, ensure Helix runs in a Docker container with a newer base image.
+
 ## Getting Started
 
 First, run the development server:
