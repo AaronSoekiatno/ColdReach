@@ -7,6 +7,7 @@ import {
   type ResumeExtractionResult,
   type ResumeProcessingResult,
 } from './utils';
+import { addCandidate } from '@/lib/helix';
 
 export const runtime = 'nodejs';
 
@@ -213,6 +214,20 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    // Save candidate to HelixDB
+    try {
+      await addCandidate({
+        name: extractionResult.name,
+        email: extractionResult.email,
+        summary: extractionResult.summary,
+        skills: extractionResult.skills.join(', '),
+        embedding,
+      });
+    } catch (error) {
+      console.error('Failed to save candidate to HelixDB:', error);
+      // Continue even if DB save fails - we still want to return the extracted data
     }
 
     // Build the successful response

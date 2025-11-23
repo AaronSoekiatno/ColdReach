@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "helix-ts": "^1.0.8",
     "mammoth": "^1.11.0",
     "next": "16.0.3",
     "pdf-parse": "^2.4.5",
