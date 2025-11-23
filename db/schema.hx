@@ -1,21 +1,21 @@
 // Candidate - represents a user who uploaded their resume
 N::Candidate {
+    INDEX email: String,
     name: String,
-    email: String,
     summary: String,
     skills: String,
-    embedding: V<768>,
+    embedding: [F64],
 }
 
 // Startup - represents a startup from the dataset
 N::Startup {
-    name: String,
+    INDEX name: String,
     industry: String,
     description: String,
     funding_stage: String,
     funding_amount: String,
     location: String,
-    embedding: V<768>,
+    embedding: [F64],
 }
 
 // Edge connecting a candidate to matched startups

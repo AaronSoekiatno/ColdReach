@@ -1,7 +1,7 @@
 // ==================== CANDIDATE QUERIES ====================
 
 // Add a new candidate from resume upload
-QUERY AddCandidate(name: String, email: String, summary: String, skills: String, embedding: V<768>) =>
+QUERY AddCandidate(name: String, email: String, summary: String, skills: String, embedding: [F64]) =>
     candidate <- AddN<Candidate>({
         name: name,
         email: email,
@@ -19,7 +19,7 @@ QUERY GetCandidateByEmail(email: String) =>
 // ==================== STARTUP QUERIES ====================
 
 // Add a new startup to the database
-QUERY AddStartup(name: String, industry: String, description: String, funding_stage: String, funding_amount: String, location: String, embedding: V<768>) =>
+QUERY AddStartup(name: String, industry: String, description: String, funding_stage: String, funding_amount: String, location: String, embedding: [F64]) =>
     startup <- AddN<Startup>({
         name: name,
         industry: industry,
@@ -38,30 +38,30 @@ QUERY GetAllStartups() =>
 
 // ==================== MATCHING QUERIES ====================
 
+// TODO: Vector similarity search - need to find correct Helix syntax
 // Find top K startups matching a candidate's embedding using vector similarity
-QUERY FindMatchingStartups(candidate_embedding: V<768>, limit: I64) =>
-    matches <- N<Startup>::VectorSearch(embedding, candidate_embedding, limit)
-    RETURN matches
+// QUERY FindMatchingStartups(candidate_embedding: [F64], limit: I64) =>
+//     matches <- N<Startup>::VectorSearch(embedding, candidate_embedding, limit)
+//     RETURN matches
 
 // Find matches for a specific candidate by their email
-QUERY FindMatchesForCandidate(email: String, limit: I64) =>
-    candidate <- N<Candidate>({email: email})
-    matches <- N<Startup>::VectorSearch(embedding, candidate.embedding, limit)
-    RETURN matches
+// QUERY FindMatchesForCandidate(email: String, limit: I64) =>
+//     candidate <- N<Candidate>({email: email})
+//     matches <- N<Startup>::VectorSearch(embedding, candidate.embedding, limit)
+//     RETURN matches
 
 // Save a match between candidate and startup
-QUERY SaveMatch(candidate_email: String, startup_name: String, score: F64, matched_at: String) =>
-    candidate <- N<Candidate>({email: candidate_email})
-    startup <- N<Startup>({name: startup_name})
-    edge <- AddE<MatchedTo>({
-        From: candidate,
-        To: startup,
-        Properties: {
-            score: score,
-            matched_at: matched_at
-        }
-    })
-    RETURN edge
+// TODO: Fix edge creation syntax - need correct AddE syntax
+// QUERY SaveMatch(candidate_email: String, startup_name: String, score: F64, matched_at: String) =>
+//     candidate <- N<Candidate>({email: candidate_email})
+//     startup <- N<Startup>({name: startup_name})
+//     edge <- AddE<MatchedTo> {
+//         from: candidate,
+//         to: startup,
+//         score: score,
+//         matched_at: matched_at
+//     }
+//     RETURN edge
 
 // Get all saved matches for a candidate
 QUERY GetCandidateMatches(email: String) =>
