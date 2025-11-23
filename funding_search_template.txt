@@ -1,0 +1,146 @@
+======================================================================
+FUNDING ROUND SEARCH TEMPLATE
+======================================================================
+
+Search queries for finding funding information:
+
+1. JSX Tool (Fall 2025)
+   - "JSX Tool raised funding"
+   - "JSX Tool seed round"
+   - "JSX Tool Y Combinator funding"
+   - site:crunchbase.com JSX Tool
+   - site:techcrunch.com JSX Tool funding
+
+2. Zephyr Fusion (Fall 2025)
+   - "Zephyr Fusion raised funding"
+   - "Zephyr Fusion seed round"
+   - "Zephyr Fusion Y Combinator funding"
+   - site:crunchbase.com Zephyr Fusion
+   - site:techcrunch.com Zephyr Fusion funding
+
+3. Mayflower (Fall 2025)
+   - "Mayflower raised funding"
+   - "Mayflower seed round"
+   - "Mayflower Y Combinator funding"
+   - site:crunchbase.com Mayflower
+   - site:techcrunch.com Mayflower funding
+
+4. item (Fall 2025)
+   - "item raised funding"
+   - "item seed round"
+   - "item Y Combinator funding"
+   - site:crunchbase.com item
+   - site:techcrunch.com item funding
+
+5. Rivet (Fall 2025)
+   - "Rivet raised funding"
+   - "Rivet seed round"
+   - "Rivet Y Combinator funding"
+   - site:crunchbase.com Rivet
+   - site:techcrunch.com Rivet funding
+
+6. Openroll (Fall 2025)
+   - "Openroll raised funding"
+   - "Openroll seed round"
+   - "Openroll Y Combinator funding"
+   - site:crunchbase.com Openroll
+   - site:techcrunch.com Openroll funding
+
+7. Fixpoint (Fall 2025)
+   - "Fixpoint raised funding"
+   - "Fixpoint seed round"
+   - "Fixpoint Y Combinator funding"
+   - site:crunchbase.com Fixpoint
+   - site:techcrunch.com Fixpoint funding
+
+8. Bear (Fall 2025)
+   - "Bear raised funding"
+   - "Bear seed round"
+   - "Bear Y Combinator funding"
+   - site:crunchbase.com Bear
+   - site:techcrunch.com Bear funding
+
+9. Moss (Fall 2025)
+   - "Moss raised funding"
+   - "Moss seed round"
+   - "Moss Y Combinator funding"
+   - site:crunchbase.com Moss
+   - site:techcrunch.com Moss funding
+
+10. Zarna (Fall 2025)
+   - "Zarna raised funding"
+   - "Zarna seed round"
+   - "Zarna Y Combinator funding"
+   - site:crunchbase.com Zarna
+   - site:techcrunch.com Zarna funding
+
+11. MarkIt (Fall 2025)
+   - "MarkIt raised funding"
+   - "MarkIt seed round"
+   - "MarkIt Y Combinator funding"
+   - site:crunchbase.com MarkIt
+   - site:techcrunch.com MarkIt funding
+
+12. Dome (Fall 2025)
+   - "Dome raised funding"
+   - "Dome seed round"
+   - "Dome Y Combinator funding"
+   - site:crunchbase.com Dome
+   - site:techcrunch.com Dome funding
+
+13. Clicks (Fall 2025)
+   - "Clicks raised funding"
+   - "Clicks seed round"
+   - "Clicks Y Combinator funding"
+   - site:crunchbase.com Clicks
+   - site:techcrunch.com Clicks funding
+
+14. Fastshot (Fall 2025)
+   - "Fastshot raised funding"
+   - "Fastshot seed round"
+   - "Fastshot Y Combinator funding"
+   - site:crunchbase.com Fastshot
+   - site:techcrunch.com Fastshot funding
+
+15. Claybird (Fall 2025)
+   - "Claybird raised funding"
+   - "Claybird seed round"
+   - "Claybird Y Combinator funding"
+   - site:crunchbase.com Claybird
+   - site:techcrunch.com Claybird funding
+
+16. LunaBill (Fall 2025)
+   - "LunaBill raised funding"
+   - "LunaBill seed round"
+   - "LunaBill Y Combinator funding"
+   - site:crunchbase.com LunaBill
+   - site:techcrunch.com LunaBill funding
+
+17. Axial Composites Industries (Fall 2025)
+   - "Axial Composites Industries raised funding"
+   - "Axial Composites Industries seed round"
+   - "Axial Composites Industries Y Combinator funding"
+   - site:crunchbase.com Axial Composites Industries
+   - site:techcrunch.com Axial Composites Industries funding
+
+18. Velvet (Fall 2025)
+   - "Velvet raised funding"
+   - "Velvet seed round"
+   - "Velvet Y Combinator funding"
+   - site:crunchbase.com Velvet
+   - site:techcrunch.com Velvet funding
+
+19. DiligenceSquared Inc. (Fall 2025)
+   - "DiligenceSquared Inc. raised funding"
+   - "DiligenceSquared Inc. seed round"
+   - "DiligenceSquared Inc. Y Combinator funding"
+   - site:crunchbase.com DiligenceSquared Inc.
+   - site:techcrunch.com DiligenceSquared Inc. funding
+
+20. Amera (Fall 2025)
+   - "Amera raised funding"
+   - "Amera seed round"
+   - "Amera Y Combinator funding"
+   - site:crunchbase.com Amera
+   - site:techcrunch.com Amera funding
+
