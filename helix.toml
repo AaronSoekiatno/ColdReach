@@ -1,5 +1,5 @@
 [project]
-name = "ColdStart"
+name = "coldstart"
 queries = "./db/"
 container_runtime = "docker"
 
