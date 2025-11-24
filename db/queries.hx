@@ -33,6 +33,11 @@ QUERY AddStartup(name: String, industry: String, description: String, funding_st
     })
     RETURN startup
 
+// Get startup by name
+QUERY GetStartupByName(name: String) =>
+    startup <- N<Startup>({name: name})
+    RETURN startup
+
 // Get all startups
 QUERY GetAllStartups() =>
     startups <- N<Startup>
@@ -41,9 +46,9 @@ QUERY GetAllStartups() =>
 // ==================== FUNDING ROUND QUERIES ====================
 
 // Add a new funding round
-QUERY AddFundingRound(id: String, stage: String, amount: String, date_raised: String, batch: String) =>
+QUERY AddFundingRound(round_id: String, stage: String, amount: String, date_raised: String, batch: String) =>
     funding_round <- AddN<FundingRound>({
-        id: id,
+        round_id: round_id,
         stage: stage,
         amount: amount,
         date_raised: date_raised,
@@ -52,8 +57,8 @@ QUERY AddFundingRound(id: String, stage: String, amount: String, date_raised: St
     RETURN funding_round
 
 // Get funding round by ID
-QUERY GetFundingRoundById(id: String) =>
-    funding_round <- N<FundingRound>({id: id})
+QUERY GetFundingRoundById(round_id: String) =>
+    funding_round <- N<FundingRound>({round_id: round_id})
     RETURN funding_round
 
 // ==================== FOUNDER QUERIES ====================
@@ -79,20 +84,14 @@ QUERY GetFounderByEmail(email: String) =>
 QUERY ConnectStartupToFounder(startup_name: String, founder_email: String) =>
     startup <- N<Startup>({name: startup_name})
     founder <- N<Founder>({email: founder_email})
-    edge <- AddE<HasFounder>({
-        from: startup,
-        to: founder
-    })
+    edge <- AddE<HasFounder>()::From(startup)::To(founder)
     RETURN edge
 
 // Connect a startup to a funding round
 QUERY ConnectStartupToFundingRound(startup_name: String, funding_round_id: String) =>
     startup <- N<Startup>({name: startup_name})
-    funding_round <- N<FundingRound>({id: funding_round_id})
-    edge <- AddE<HasFundingRound>({
-        from: startup,
-        to: funding_round
-    })
+    funding_round <- N<FundingRound>({round_id: funding_round_id})
+    edge <- AddE<HasFundingRound>()::From(startup)::To(funding_round)
     RETURN edge
 
 // ==================== MATCHING QUERIES ====================

@@ -22,7 +22,7 @@ N::Startup {
 
 // FundingRound - represents a funding round for a startup
 N::FundingRound {
-    INDEX id: String,
+    INDEX round_id: String,
     stage: String,
     amount: String,
     date_raised: String,
