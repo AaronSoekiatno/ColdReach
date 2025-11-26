@@ -1,0 +1,58 @@
+services:
+  # Note: Helix Database should be run separately using: helix dev
+  # It will run on port 6969. The web app connects to it via host.docker.internal (Windows/Mac)
+  # or host network (Linux). For WSL, use host.docker.internal or localhost.
+
+  # Next.js Web App - Production Mode
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coldstart-web
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Makes host.docker.internal work on Linux/WSL
+    environment:
+      - NODE_ENV=production
+      - HELIX_URL=http://host.docker.internal:6969
+    # Uses .env.local (preferred, gitignored)
+    # If you use .env instead, change this to: - .env
+    env_file:
+      - .env.local
+    # Note: Make sure Helix is running separately with: helix dev
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Next.js Web App - Development Mode (with hot reload)
+  web-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: coldstart-web-dev
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Makes host.docker.internal work on Linux/WSL
+    volumes:
+      # Mount source code for hot reload
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - HELIX_URL=http://host.docker.internal:6969
+      - WATCHPACK_POLLING=true  # Enable polling for file changes
+    # Uses .env.local (preferred, gitignored)
+    # If you use .env instead, change this to: - .env
+    env_file:
+      - .env.local
+    # Note: Make sure Helix is running separately with: helix dev
+    command: npm run dev
+    restart: unless-stopped
+    profiles:
+      - dev
+
+# Note: Helix data is managed by the Helix CLI in the .helix/ directory
+

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleAIFileManager } from '@google/generative-ai/server';
 import {
   validateFile,
   extractDocxText,
@@ -12,8 +13,17 @@ import { addCandidate } from '@/lib/helix';
 
 export const runtime = 'nodejs';
 
-// Initialize Gemini client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Get Gemini clients - initialized lazily to ensure env vars are loaded
+function getGeminiClients() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
+  return {
+    genAI: new GoogleGenerativeAI(apiKey),
+    fileManager: new GoogleAIFileManager(apiKey),
+  };
+}
 
 /**
  * Extracts name, email, skills, and summary from resume using Gemini
@@ -24,6 +34,8 @@ async function extractResumeDataWithGemini(
   buffer: Buffer,
   arrayBuffer: ArrayBuffer
 ): Promise<ResumeExtractionResult> {
+  const { genAI, fileManager } = getGeminiClients();
+
   const prompt = `Extract the following from this resume and return JSON only in this exact form:
 {
   "name": "Full name of the candidate",
@@ -33,7 +45,8 @@ async function extractResumeDataWithGemini(
 }`;
 
   // Try different model names in order of preference
-  const modelNames = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'];
+  // Using newer Gemini 2.x models as 1.5 models are deprecated
+  const modelNames = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'];
   let lastError: any = null;
 
   for (const modelName of modelNames) {
@@ -42,22 +55,50 @@ async function extractResumeDataWithGemini(
       let result;
 
       if (isPdfFile(file)) {
-        // For PDFs: Try to send directly to Gemini (works with 1.5 models)
-        // If this fails (e.g., with gemini-pro), we'll catch and try next model
-        // Convert ArrayBuffer to base64 string
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const base64Data = Buffer.from(uint8Array).toString('base64');
+        // For PDFs: Upload to Gemini File API first, then use the file reference
+        // This is the recommended approach for PDFs
+        console.log(`[${modelName}] Uploading PDF to Gemini File API...`);
+        const uploadResult = await fileManager.uploadFile(buffer, {
+          mimeType: 'application/pdf',
+          displayName: file!.name,
+        });
 
-        // Use the simplified array format with proper inlineData structure
+        const uploadedFile = uploadResult.file;
+        console.log(`[${modelName}] PDF uploaded, state: ${uploadedFile.state}, name: ${uploadedFile.name}`);
+
+        // Wait for the file to be processed
+        let fileMetadata = uploadedFile;
+        while (fileMetadata.state === 'PROCESSING') {
+          console.log(`[${modelName}] Waiting for PDF processing...`);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          fileMetadata = await fileManager.getFile(uploadedFile.name);
+        }
+
+        if (fileMetadata.state === 'FAILED') {
+          throw new Error('PDF processing failed');
+        }
+
+        console.log(`[${modelName}] PDF ready, generating content with fileUri: ${fileMetadata.uri}`);
+
+        // Now use the uploaded file in the request
         result = await model.generateContent([
-          prompt,
+          { text: prompt },
           {
-            inlineData: {
-              data: base64Data,
-              mimeType: 'application/pdf',
+            fileData: {
+              fileUri: fileMetadata.uri,
+              mimeType: fileMetadata.mimeType,
             },
           },
         ]);
+
+        // Clean up: delete the uploaded file after processing
+        try {
+          await fileManager.deleteFile(uploadedFile.name);
+          console.log(`[${modelName}] Deleted uploaded file`);
+        } catch (error) {
+          console.warn('Failed to delete uploaded file:', error);
+          // Continue even if deletion fails
+        }
       } else {
         // For DOCX: Extract text first, then send to Gemini
         const resumeText = await extractDocxText(buffer);
@@ -138,6 +179,7 @@ async function generateEmbedding(
   summary: string,
   skills: string[]
 ): Promise<number[]> {
+  const { genAI } = getGeminiClients();
   const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
 
   const combinedText = `${summary}\nSkills: ${skills.join(', ')}`;
@@ -159,7 +201,12 @@ async function generateEmbedding(
 export async function POST(request: NextRequest) {
   try {
     // Check for API key
-    if (!process.env.GEMINI_API_KEY) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    console.log('GEMINI_API_KEY exists:', !!apiKey);
+    console.log('GEMINI_API_KEY length:', apiKey?.length);
+    console.log('GEMINI_API_KEY first 10 chars:', apiKey?.substring(0, 10));
+
+    if (!apiKey) {
       return NextResponse.json(
         {
           success: false,

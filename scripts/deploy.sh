@@ -64,25 +64,25 @@ check_env() {
 # Build Docker images
 build() {
     log_info "Building Docker images..."
-    docker-compose build --no-cache
+    docker compose build --no-cache
     log_success "Docker images built"
 }
 
 # Start services
 start() {
     log_info "Starting services..."
-    docker-compose up -d
+    docker compose up -d
 
     log_info "Waiting for services to be healthy..."
     sleep 10
 
     # Check if services are running
-    if docker-compose ps | grep -q "Up"; then
+    if docker compose ps | grep -q "Up"; then
         log_success "Services started successfully"
         log_info "Web app: http://localhost:3000"
         log_info "Helix DB: http://localhost:6969"
     else
-        log_error "Services failed to start. Check logs with: docker-compose logs"
+        log_error "Services failed to start. Check logs with: docker compose logs"
         exit 1
     fi
 }
@@ -90,20 +90,20 @@ start() {
 # Stop services
 stop() {
     log_info "Stopping services..."
-    docker-compose down
+    docker compose down
     log_success "Services stopped"
 }
 
 # Restart services
 restart() {
     log_info "Restarting services..."
-    docker-compose restart
+    docker compose restart
     log_success "Services restarted"
 }
 
 # View logs
 logs() {
-    docker-compose logs -f "$@"
+    docker compose logs -f "$@"
 }
 
 # Run CSV ingestion
@@ -125,7 +125,7 @@ deploy() {
 
     # Build and restart
     log_info "Building and restarting services..."
-    docker-compose up -d --build
+    docker compose up -d --build
 
     # Wait for health check
     log_info "Waiting for services to be healthy..."
@@ -170,7 +170,7 @@ restore() {
     log_info "Restoring from: $1"
 
     # Stop Helix to avoid data corruption
-    docker-compose stop helix
+    docker compose stop helix
 
     # Restore data
     docker run --rm \
@@ -179,7 +179,7 @@ restore() {
         alpine sh -c "cd /data && tar xzf /backup/$1"
 
     # Restart Helix
-    docker-compose start helix
+    docker compose start helix
 
     log_success "Restore complete"
 }
@@ -195,14 +195,14 @@ clean() {
     fi
 
     log_info "Removing containers and volumes..."
-    docker-compose down -v
+    docker compose down -v
     log_success "Cleanup complete"
 }
 
 # Show status
 status() {
     log_info "Service Status:"
-    docker-compose ps
+    docker compose ps
 
     echo ""
     log_info "Resource Usage:"
