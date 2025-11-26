@@ -32,10 +32,10 @@ export const Hero = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-blue-100 via-blue-50 to-white" />
 
       {/* Sign In Button */}
-      <div className="absolute top-8 left-8 z-20">
+      <div className="absolute top-8 right-8 z-20">
         <Button 
           variant="outline" 
-          className="backdrop-blur-sm bg-background/50 hover:bg-background/80 transition-all hover:-translate-y-1 duration-300"
+          className="backdrop-blur-3xl bg-background/40 hover:bg-background/60 transition-all hover:-translate-y-1 duration-300 border-border/30 rounded-2xl"
         >
           Sign In
         </Button>
