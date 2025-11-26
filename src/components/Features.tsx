@@ -19,8 +19,8 @@ const features = [
   },
   {
     icon: Zap,
-    title: "Fast & Efficient",
-    description: "Send your resume to hundreds of startups in minutes instead of spending weeks on applications."
+    title: "Save 95% of Your Time",
+    description: "Send your resume to hundreds of startups in minutes instead of spending weeks manually applying. What takes 40+ hours normally takes just 5 minutes with Resume Sender."
   }
 ];
 
@@ -41,7 +41,7 @@ export const Features = () => {
           {features.map((feature, index) => (
             <Card 
               key={index} 
-              className="border-border bg-card hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              className="border-border bg-card hover:shadow-lg transition-all duration-300 hover:-translate-y-2"
             >
               <CardHeader>
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
