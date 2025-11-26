@@ -13,8 +13,8 @@ export const Hero = () => {
       if (selectedFile.type === 'application/pdf' || selectedFile.name.endsWith('.pdf')) {
         setFile(selectedFile);
         toast({
-          title: "Resume uploaded",
-          description: `${selectedFile.name} is ready to send`,
+          title: "Success!",
+          description: "Your resume is being sent to top startups. We'll notify you when responses come in.",
         });
       } else {
         toast({
@@ -24,14 +24,6 @@ export const Hero = () => {
         });
       }
     }
-  };
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    toast({
-      title: "Success!",
-      description: "Your resume is being sent to top startups. We'll notify you when responses come in.",
-    });
   };
 
   return (
@@ -61,53 +53,38 @@ export const Hero = () => {
             </p>
           </div>
 
-          {/* Liquid Glass Resume Upload Block */}
+          {/* Apple-style Liquid Glass Resume Upload Block */}
           <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-            <form onSubmit={handleSubmit}>
-              <div className="relative backdrop-blur-xl bg-background/30 border border-border/50 rounded-3xl p-8 shadow-2xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 rounded-3xl" />
-                <div className="relative space-y-6">
-                  <h2 className="text-2xl font-bold text-foreground">Send Resume</h2>
-                  
-                  <div className="space-y-2">
-                    <input
-                      id="resume"
-                      type="file"
-                      accept=".pdf"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      required
-                    />
-                    <label
-                      htmlFor="resume"
-                      className="flex items-center justify-center gap-3 w-full p-10 border-2 border-dashed border-border/50 rounded-2xl cursor-pointer hover:bg-muted/30 transition-all hover:-translate-y-1 duration-300 bg-background/20 backdrop-blur-sm"
-                    >
-                      {file ? (
-                        <>
-                          <FileText className="h-8 w-8 text-primary" />
-                          <span className="text-base font-medium text-foreground">{file.name}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-8 w-8 text-muted-foreground" />
-                          <span className="text-base text-muted-foreground">
-                            Click to upload your resume (PDF)
-                          </span>
-                        </>
-                      )}
-                    </label>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    size="lg" 
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground transition-all hover:-translate-y-1 duration-300"
-                  >
-                    Get Started
-                  </Button>
-                </div>
+            <div className="relative backdrop-blur-3xl bg-background/40 border border-border/30 rounded-[2.5rem] p-12 shadow-[0_8px_32px_0_rgba(31,38,135,0.15)]">
+              <div className="absolute inset-0 bg-gradient-to-br from-background/50 via-background/30 to-background/20 rounded-[2.5rem]" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(120,119,198,0.1),transparent_50%)] rounded-[2.5rem]" />
+              
+              <div className="relative">
+                <input
+                  id="resume"
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="resume"
+                  className="flex flex-col items-center justify-center gap-4 w-full min-h-[200px] cursor-pointer group"
+                >
+                  {file ? (
+                    <>
+                      <FileText className="h-12 w-12 text-primary transition-transform group-hover:scale-110 duration-300" />
+                      <span className="text-xl font-semibold text-foreground">{file.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-12 w-12 text-foreground/60 transition-all group-hover:text-foreground group-hover:scale-110 duration-300" />
+                      <span className="text-2xl font-semibold text-foreground">Send Resume</span>
+                    </>
+                  )}
+                </label>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       </div>
