@@ -4,40 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Upload, FileText } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
 import { Features } from "@/components/Features";
 import { StartupsCarousel } from "@/components/StartupsCarousel";
 import { Footer } from "@/components/Footer";
+import { SignInModal } from "@/components/SignInModal";
 
 export const Hero = () => {
   const [file, setFile] = useState<File | null>(null);
-  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const { toast } = useToast();
-
-  const handleSignIn = async () => {
-    try {
-      setIsSigningIn(true);
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        throw error;
-      }
-    } catch (error) {
-      console.error('Sign in error:', error);
-      toast({
-        title: "Sign in failed",
-        description: error instanceof Error ? error.message : "Failed to sign in with Google. Please try again.",
-        variant: "destructive",
-      });
-      setIsSigningIn(false);
-    }
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -66,13 +41,18 @@ export const Hero = () => {
         <div className="absolute top-8 right-8 z-20">
           <Button 
             variant="outline" 
-            onClick={handleSignIn}
-            disabled={isSigningIn}
+            onClick={() => setIsSignInModalOpen(true)}
             className="backdrop-blur-3xl bg-background/40 hover:bg-background/60 transition-all hover:-translate-y-1 duration-300 border-white/30 rounded-2xl text-white hover:text-white"
           >
-            {isSigningIn ? "Signing in..." : "Sign In"}
+            Sign In
           </Button>
         </div>
+
+        {/* Sign In Modal */}
+        <SignInModal 
+          open={isSignInModalOpen} 
+          onOpenChange={setIsSignInModalOpen} 
+        />
 
         {/* Content */}
         <div className="container relative z-10 px-4 py-20">
