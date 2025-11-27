@@ -188,9 +188,9 @@ export const Hero = () => {
                   </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[200px]">
+              <DropdownMenuContent align="end" className="border-white/30 bg-white/10 text-white px-0 py-0 rounded-2xl overflow-hidden min-w-[250px]">
                 <DropdownMenuItem
-                  className="cursor-pointer text-white"
+                  className="cursor-pointer text-white w-full px-4 py-2 text-center hover:bg-white/20 focus:bg-white/20"
                   onSelect={async () => {
                     await supabase.auth.signOut();
                     setUser(null);
