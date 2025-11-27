@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 // Load .env.local file
 config({ path: resolve(process.cwd(), '.env.local') });
 
+import { randomUUID } from 'crypto';
 import puppeteer, { Browser, Page } from 'puppeteer';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Pinecone } from '@pinecone-database/pinecone';
@@ -26,9 +27,9 @@ interface StartupData {
   industry: string;
   location: string;
   website: string;
-  funding_stage: string;
-  amount_raised: string;
-  date_raised: string;
+  funding_stage: string | null; // Can be null if not found
+  amount_raised: string | null; // Can be null if not found - no guessing
+  date_raised: string | null; // Can be null if not found - no guessing
   techcrunch_article_link?: string;
   techcrunch_article_content?: string;
 }
@@ -244,9 +245,9 @@ function extractFundingAmount(text: string): string | null {
 }
 
 /**
- * Extract funding stage
+ * Extract funding stage - only if explicitly mentioned
  */
-function extractFundingStage(text: string): string {
+function extractFundingStage(text: string): string | null {
   const textLower = text.toLowerCase();
   
   if (textLower.includes('seed') || textLower.includes('pre-seed')) {
@@ -265,13 +266,14 @@ function extractFundingStage(text: string): string {
     return 'Bridge';
   }
   
-  return 'Seed';
+  return null; // Don't guess - return null if not found
 }
 
 /**
  * Parse article date from various sources (URL, date field, etc.)
+ * Returns null if date cannot be determined - no guessing
  */
-function parseArticleDate(article: TechCrunchArticle): Date {
+function parseArticleDate(article: TechCrunchArticle): Date | null {
   // Try to parse date from URL first (most reliable)
   if (article.link) {
     const urlMatch = article.link.match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
@@ -292,16 +294,35 @@ function parseArticleDate(article: TechCrunchArticle): Date {
     }
   }
   
-  // Fallback to current date
-  return new Date();
+  // No fallback - return null if date cannot be determined
+  return null;
 }
 
 /**
- * Extract date
+ * Extract date - only if explicitly found in article
  */
-function extractDate(article: TechCrunchArticle): string {
-  const date = parseArticleDate(article);
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+function extractDate(article: TechCrunchArticle): string | null {
+  // Try to parse date from URL first (most reliable)
+  if (article.link) {
+    const urlMatch = article.link.match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
+    if (urlMatch) {
+      const [, year, month, day] = urlMatch;
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      }
+    }
+  }
+  
+  // Try to parse from date field
+  if (article.date) {
+    const parsed = new Date(article.date);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+  }
+  
+  return null; // Don't guess - return null if not found
 }
 
 /**
@@ -385,7 +406,7 @@ function extractIndustry(text: string): string {
 }
 
 /**
- * Extract business type
+ * Extract business type - only if explicitly mentioned
  */
 function extractBusinessType(text: string): string {
   const textLower = text.toLowerCase();
@@ -400,7 +421,7 @@ function extractBusinessType(text: string): string {
     return 'Platform';
   }
   
-  return 'B2B';
+  return ''; // Don't guess - return empty string if not found
 }
 
 /**
@@ -444,26 +465,28 @@ Date: ${article.date || ''}
 
     const prompt = `Extract structured startup funding information from this TechCrunch article. Return ONLY valid JSON, no markdown, no explanation.
 
+IMPORTANT: Only extract information that is explicitly stated in the article. Do NOT guess, infer, or use defaults. If information is not mentioned, use null or empty string.
+
 Article:
 ${articleText}
 
 Extract the following information:
-- Company_Name: The name of the startup/company (required, must be exact)
-- funding_stage: Seed, Series A, Series B, Series C, Series D, Bridge, IPO, or "Seed" if unclear
-- amount_raised: Funding amount in format like "$5M", "$10.5M", "$2.5B", or null if not mentioned
-- date_raised: Date of funding announcement (format: "Month Year" or "YYYY-MM-DD" or article date)
-- location: City, State/Country (e.g., "San Francisco, CA" or "London, UK") or empty string
-- industry: Primary industry (e.g., "Artificial Intelligence", "Fintech", "Healthcare", "SaaS") or empty string
-- business_type: "B2B", "Consumer", "Marketplace", "Platform", or "B2B" if unclear
-- website: Company website domain (without http://) or empty string
-- company_description: First 2-3 sentences summarizing what the company does (max 500 chars)
+- Company_Name: The name of the startup/company (required, must be exact from article)
+- funding_stage: Only if explicitly stated: Seed, Series A, Series B, Series C, Series D, Bridge, IPO. Use null if not mentioned.
+- amount_raised: Funding amount ONLY if explicitly stated in format like "$5M", "$10.5M", "$2.5B". Use null if not mentioned.
+- date_raised: Date of funding announcement ONLY if explicitly stated (format: "Month Year" or "YYYY-MM-DD"). Use null if not mentioned.
+- location: City, State/Country ONLY if explicitly stated (e.g., "San Francisco, CA" or "London, UK"). Use empty string if not mentioned.
+- industry: Primary industry ONLY if explicitly stated (e.g., "Artificial Intelligence", "Fintech", "Healthcare", "SaaS"). Use empty string if not mentioned.
+- business_type: ONLY if explicitly stated: "B2B", "Consumer", "Marketplace", "Platform". Use empty string if not mentioned.
+- website: Company website domain ONLY if explicitly stated (without http://). Use empty string if not mentioned.
+- company_description: First 2-3 sentences summarizing what the company does ONLY from the article content (max 500 chars). Use empty string if no description available.
 
 Return JSON in this exact format:
 {
   "Company_Name": "string or null",
-  "funding_stage": "string",
+  "funding_stage": "string or null",
   "amount_raised": "string or null",
-  "date_raised": "string",
+  "date_raised": "string or null",
   "location": "string",
   "industry": "string",
   "business_type": "string",
@@ -518,26 +541,32 @@ If no company name can be identified, return null.`;
       return null;
     }
 
-    // Use full article content for description (better for embeddings)
-    const fullDescription = article.content || article.description || article.title || '';
-    const description = fullDescription.length > 1000 
-      ? fullDescription.substring(0, 1000) + '...'
-      : fullDescription;
+    // Use ONLY what Gemini extracted - no defaults, no guessing
+    // Convert null strings to actual null values
+    const toNull = (value: any): string | null => {
+      if (value === null || value === undefined || value === 'null' || value === '') {
+        return null;
+      }
+      return String(value).trim() || null;
+    };
 
-    // Use Gemini's extracted data directly - it's more accurate than regex
-    // Only use regex helpers as absolute last resort if Gemini returns empty/null
+    const toEmptyString = (value: any): string => {
+      if (value === null || value === undefined || value === 'null') {
+        return '';
+      }
+      return String(value).trim() || '';
+    };
+
     return {
       Company_Name: extracted.Company_Name,
-      company_description: extracted.company_description || description.substring(0, 500),
-      business_type: extracted.business_type || 'B2B',
-      industry: extracted.industry || '',
-      location: extracted.location || '',
-      // Use Gemini's website extraction, only fall back to regex if completely empty
-      website: extracted.website || (extracted.Company_Name ? extractWebsite(extracted.Company_Name, article.content || '') : ''),
-      funding_stage: extracted.funding_stage || 'Seed',
-      amount_raised: extracted.amount_raised || '$1.5M',
-      // Use Gemini's date extraction, only fall back to regex if completely empty
-      date_raised: extracted.date_raised || extractDate(article),
+      company_description: toEmptyString(extracted.company_description), // Only use what was extracted
+      business_type: toEmptyString(extracted.business_type), // No default
+      industry: toEmptyString(extracted.industry),
+      location: toEmptyString(extracted.location),
+      website: toEmptyString(extracted.website), // No guessing website
+      funding_stage: toNull(extracted.funding_stage), // No default to 'Seed'
+      amount_raised: toNull(extracted.amount_raised), // No default to '$1.5M'
+      date_raised: toNull(extracted.date_raised), // No fallback date
       techcrunch_article_link: article.link || '',
       techcrunch_article_content: article.content || article.description || '',
     };
@@ -565,23 +594,20 @@ function parseArticleToStartupRegex(article: TechCrunchArticle): StartupData | n
   const businessType = extractBusinessType(content);
   const website = extractWebsite(companyName, content);
 
-  // Use full article content for description (better for embeddings)
-  // Take first 1000 chars for description, but keep full content for article_content
-  const fullDescription = article.content || article.description || article.title || '';
-  const description = fullDescription.length > 1000 
-    ? fullDescription.substring(0, 1000) + '...'
-    : fullDescription;
+  // Only use article content if it exists - don't create fake descriptions
+  // For embeddings, we'll use the full article content stored in techcrunch_article_content
+  const description = article.content || article.description || '';
 
   return {
     Company_Name: companyName,
-    company_description: description,
-    business_type: businessType,
+    company_description: description, // Only real article content, no guessing
+    business_type: businessType, // May be empty string if not found
     industry: industry,
     location: location,
     website: website,
-    funding_stage: fundingStage,
-    amount_raised: fundingAmount || '$1.5M',
-    date_raised: dateRaised,
+    funding_stage: fundingStage, // May be null if not found
+    amount_raised: fundingAmount, // May be null if not found - NO DEFAULT
+    date_raised: dateRaised, // May be null if not found - NO DEFAULT
     techcrunch_article_link: article.link || '',
     techcrunch_article_content: article.content || article.description || '',
   };
@@ -1100,7 +1126,7 @@ async function scrapeAndIngestTechCrunch() {
     
     let allArticles: TechCrunchArticle[] = [];
     let pageNum = 1;
-    const maxPages = 5; // Scrape up to 5 pages (most recent articles)
+    const maxPages = 2; // TESTING: Scrape only 1 page. Change back to 5 for production
     let hasMore = true;
     
     // Scrape multiple pages to get recent articles
@@ -1141,9 +1167,16 @@ async function scrapeAndIngestTechCrunch() {
     console.log(`\n📊 Found ${allArticles.length} total funding articles across ${pageNum - 1} page(s)\n`);
     
     // Sort articles by date (newest first)
+    // Articles without dates go to the end
     allArticles.sort((a, b) => {
       const dateA = parseArticleDate(a);
       const dateB = parseArticleDate(b);
+      
+      // Handle null dates - put them at the end
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1; // dateA goes after dateB
+      if (!dateB) return -1; // dateB goes after dateA
+      
       return dateB.getTime() - dateA.getTime(); // Newest first
     });
     
@@ -1151,8 +1184,14 @@ async function scrapeAndIngestTechCrunch() {
     if (allArticles.length > 0) {
       const newestDate = parseArticleDate(allArticles[0]);
       const oldestDate = parseArticleDate(allArticles[allArticles.length - 1]);
-      console.log(`   Newest: ${newestDate.toISOString().split('T')[0]}`);
-      console.log(`   Oldest: ${oldestDate.toISOString().split('T')[0]}\n`);
+      if (newestDate) {
+        console.log(`   Newest: ${newestDate.toISOString().split('T')[0]}`);
+      }
+      if (oldestDate) {
+        console.log(`   Oldest: ${oldestDate.toISOString().split('T')[0]}\n`);
+      } else {
+        console.log(`   (Some articles have no date)\n`);
+      }
     }
     
     // Filter out already-scraped articles
@@ -1168,16 +1207,24 @@ async function scrapeAndIngestTechCrunch() {
       return;
     }
     
+    // TESTING: Limit to first 3 startups for testing
+    const maxStartupsToProcess = 3;
+    const articlesToProcess = newArticles.slice(0, maxStartupsToProcess);
+    
+    if (newArticles.length > maxStartupsToProcess) {
+      console.log(`🧪 TESTING MODE: Processing only first ${maxStartupsToProcess} articles (${newArticles.length} total available)\n`);
+    }
+    
     // Process each new article
-    for (let i = 0; i < newArticles.length; i++) {
-      const article = newArticles[i];
+    for (let i = 0; i < articlesToProcess.length; i++) {
+      const article = articlesToProcess[i];
       
       seenArticleLinks.add(article.link || '');
       
       try {
         // Scrape full article content
         if (article.link && isValidArticleUrl(article.link)) {
-          console.log(`[${i + 1}/${newArticles.length}] 📄 Scraping: ${article.title?.substring(0, 60)}...`);
+          console.log(`[${i + 1}/${articlesToProcess.length}] 📄 Scraping: ${article.title?.substring(0, 60)}...`);
           const fullArticle = await scrapeArticlePage(browser, article.link);
           
           if (fullArticle) {
@@ -1240,6 +1287,13 @@ async function scrapeAndIngestTechCrunch() {
   for (let i = 0; i < allStartups.length; i++) {
     const startup = allStartups[i];
     
+    // Validate required fields before processing
+    if (!startup.Company_Name || startup.Company_Name.trim().length === 0) {
+      console.log(`[${i + 1}/${allStartups.length}] ⚠️  Skipping: Missing company name`);
+      errorCount++;
+      continue;
+    }
+    
     try {
       console.log(`[${i + 1}/${allStartups.length}] Processing: ${startup.Company_Name}`);
 
@@ -1263,9 +1317,20 @@ async function scrapeAndIngestTechCrunch() {
 
       console.log('  Generating embedding...');
       const embedding = await generateEmbedding(embeddingText);
+      
+      if (embedding.length === 0) {
+        console.warn('  ⚠️  No embedding generated (empty array). Continuing without embedding...');
+      } else {
+        console.log(`  ✓ Generated embedding (${embedding.length} dimensions)`);
+      }
 
       // Create startup in Supabase (all data in one table)
       console.log('  Creating startup in Supabase...');
+      
+      // Validate required fields before insert
+      if (!startup.Company_Name || startup.Company_Name.trim().length === 0) {
+        throw new Error('Company name is required but missing');
+      }
       const pineconeId = `startup-${startup.Company_Name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
       
       // Combine business_type and industry into keywords
@@ -1278,25 +1343,34 @@ async function scrapeAndIngestTechCrunch() {
       const founderLinkedin = '';
       const jobOpenings = ''; // Can be populated from other sources
       
+      // Generate UUID explicitly to ensure id is set (fixes null constraint violation)
+      const startupId = randomUUID();
+      
+      // Helper to convert empty strings to null (PostgreSQL prefers null for optional fields)
+      const toNull = (value: string | null | undefined): string | null => {
+        return value && value.trim() ? value : null;
+      };
+      
       const { data: startupData, error: startupError } = await supabase
         .from('startups')
         .insert({
+          id: startupId, // Explicitly set UUID to avoid null constraint violation
           name: startup.Company_Name,
-          funding_amount: startup.amount_raised || null,
-          job_openings: jobOpenings || null,
-          round_type: startup.funding_stage || null,
-          date: startup.date_raised || null,
-          location: startup.location || null,
-          website: startup.website || null,
-          founder_linkedin: founderLinkedin || null,
-          industry: startup.industry || null,
-          founder_names: founderNames || null,
-          founder_emails: founderEmails || null,
-          keywords: keywords || null,
-          description: description, // Keep for embeddings
+          funding_amount: toNull(startup.amount_raised),
+          job_openings: toNull(jobOpenings),
+          round_type: toNull(startup.funding_stage),
+          date: toNull(startup.date_raised),
+          location: toNull(startup.location),
+          website: toNull(startup.website),
+          founder_linkedin: toNull(founderLinkedin),
+          industry: toNull(startup.industry),
+          founder_names: toNull(founderNames),
+          founder_emails: toNull(founderEmails),
+          keywords: toNull(keywords),
+          description: description || null, // Keep for embeddings, but allow null if empty
           pinecone_id: pineconeId,
-          techcrunch_article_link: startup.techcrunch_article_link || null,
-          techcrunch_article_content: startup.techcrunch_article_content || null,
+          techcrunch_article_link: toNull(startup.techcrunch_article_link),
+          techcrunch_article_content: toNull(startup.techcrunch_article_content),
           data_source: 'techcrunch',
           needs_enrichment: true, // Mark for web search enrichment
           enrichment_status: 'pending',
@@ -1309,23 +1383,39 @@ async function scrapeAndIngestTechCrunch() {
           console.log('  Startup already exists, skipping...');
           continue;
         }
+        // Log detailed error information
+        console.error(`  Supabase error details:`);
+        console.error(`    Code: ${startupError.code || 'N/A'}`);
+        console.error(`    Message: ${startupError.message || 'N/A'}`);
+        console.error(`    Details: ${startupError.details || 'N/A'}`);
+        console.error(`    Hint: ${startupError.hint || 'N/A'}`);
         throw startupError;
       }
 
-      // Store embedding in Pinecone
+      // Store embedding in Pinecone (only if we have an embedding)
       if (embedding.length > 0 && pineconeIndex) {
         console.log('  Storing embedding in Pinecone...');
-        await storeEmbeddingInPinecone(pineconeId, embedding, {
-          name: startup.Company_Name,
-          industry: startup.industry || '',
-          description: description,
-          keywords: keywords,
-          business_type: startup.business_type || '',
-          location: startup.location || '',
-          funding_stage: startup.funding_stage || '',
-          funding_amount: startup.amount_raised || '',
-          website: startup.website || '',
-        });
+        try {
+          await storeEmbeddingInPinecone(pineconeId, embedding, {
+            name: startup.Company_Name,
+            industry: startup.industry || '',
+            description: description,
+            keywords: keywords,
+            business_type: startup.business_type || '',
+            location: startup.location || '',
+            funding_stage: startup.funding_stage || '',
+            funding_amount: startup.amount_raised || '',
+            website: startup.website || '',
+          });
+          console.log('  ✓ Embedding stored in Pinecone');
+        } catch (pineconeError) {
+          console.warn(`  ⚠️  Failed to store embedding in Pinecone: ${pineconeError instanceof Error ? pineconeError.message : String(pineconeError)}`);
+          // Continue even if Pinecone fails - Supabase insert is more important
+        }
+      } else if (embedding.length === 0) {
+        console.warn('  ⚠️  No embedding to store (empty array)');
+      } else if (!pineconeIndex) {
+        console.warn('  ⚠️  Pinecone index not available, skipping embedding storage');
       }
 
       successCount++;
@@ -1335,9 +1425,36 @@ async function scrapeAndIngestTechCrunch() {
       
     } catch (error) {
       errorCount++;
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Better error logging to see actual error details
+      let errorMessage = 'Unknown error';
+      let errorDetails = '';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        errorDetails = error.stack || '';
+      } else if (typeof error === 'object' && error !== null) {
+        // Handle Supabase errors which are objects
+        const errorObj = error as any;
+        errorMessage = errorObj.message || errorObj.error || JSON.stringify(errorObj);
+        if (errorObj.code) {
+          errorDetails = `Code: ${errorObj.code}`;
+        }
+        if (errorObj.details) {
+          errorDetails += ` | Details: ${errorObj.details}`;
+        }
+        if (errorObj.hint) {
+          errorDetails += ` | Hint: ${errorObj.hint}`;
+        }
+      } else {
+        errorMessage = String(error);
+      }
+      
       console.error(`  ✗ Error processing ${startup.Company_Name}:`);
-      console.error(`    Error: ${errorMessage}\n`);
+      console.error(`    Error: ${errorMessage}`);
+      if (errorDetails) {
+        console.error(`    ${errorDetails}`);
+      }
+      console.error('');
     }
   }
 
