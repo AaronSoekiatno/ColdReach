@@ -223,7 +223,7 @@ export const Hero = () => {
                   >
                     {file ? (
                       <>
-                        <FileText className="h-12 w-12 text-primary transition-transform group-hover:scale-110 duration-300" />
+                        <FileText className="h-12 w-12 text-white transition-transform group-hover:scale-110 duration-300" />
                         <span className="text-xl font-semibold text-white">{file.name}</span>
                       </>
                     ) : (
