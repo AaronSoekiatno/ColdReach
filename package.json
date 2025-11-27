@@ -17,6 +17,7 @@
     "test-scrape-techcrunch": "tsx yc_companies/test_scrape_techcrunch.ts",
     "scrape-and-ingest-techcrunch": "tsx yc_companies/scrape_and_ingest_techcrunch.ts",
     "scrape-techcrunch-supabase": "tsx yc_companies/scrape_techcrunch_supabase_pinecone.ts",
+    "test-techcrunch": "tsx yc_companies/test_techcrunch_quick.ts",
     "enrich-startups": "tsx yc_companies/enrich_startup_data.ts",
     "enrich-startup": "tsx yc_companies/enrich_startup_data.ts --id=",
     "type-check": "tsc --noEmit",

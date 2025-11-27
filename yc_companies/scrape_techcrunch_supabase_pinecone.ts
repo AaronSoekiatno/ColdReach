@@ -33,32 +33,17 @@ interface StartupData {
   techcrunch_article_content?: string;
 }
 
-// Categories to scrape
-const STARTUP_CATEGORIES = [
-  'startups',
-  'venture',
-  'fintech',
-  'artificial-intelligence',
-  'apps',
-  'hardware',
-  'security',
-  'cryptocurrency',
-  'transportation',
-  'media-entertainment'
-];
+/**
+ * FUNDING-FOCUSED SCRAPING
+ * 
+ * This scraper focuses exclusively on TechCrunch's dedicated fundraising category:
+ * https://techcrunch.com/category/fundraising/
+ * 
+ * This is the most efficient way to get all funding-related articles in one place.
+ */
 
-const STARTUP_TAGS = [
-  'startup',
-  'funding',
-  'seed',
-  'series-a',
-  'series-b',
-  'unicorn',
-  'y-combinator',
-  'yc',
-  'venture-capital',
-  'vc'
-];
+// Only scrape the dedicated fundraising category
+const FUNDRAISING_CATEGORY = 'fundraising';
 
 // Initialize clients
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -91,29 +76,48 @@ const genAI = process.env.GEMINI_API_KEY
 /**
  * Generates an embedding using Gemini
  */
-async function generateEmbedding(text: string): Promise<number[]> {
+async function generateEmbedding(text: string, retries: number = 3): Promise<number[]> {
   if (!genAI) {
     return [];
   }
 
-  try {
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
-    const result = await model.embedContent({
-      content: {
-        role: 'user',
-        parts: [{ text: text }],
-      },
-    });
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
+      const result = await model.embedContent({
+        content: {
+          role: 'user',
+          parts: [{ text: text }],
+        },
+      });
 
-    if (!result.embedding || !result.embedding.values || !Array.isArray(result.embedding.values)) {
-      throw new Error('Failed to generate embedding: Invalid response structure');
+      if (!result.embedding || !result.embedding.values || !Array.isArray(result.embedding.values)) {
+        throw new Error('Failed to generate embedding: Invalid response structure');
+      }
+
+      return result.embedding.values;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Check for rate limit errors
+      if (errorMessage.includes('rate limit') || errorMessage.includes('429') || errorMessage.includes('quota')) {
+        if (attempt < retries - 1) {
+          const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.warn(`  ⚠️  Rate limited, waiting ${delay}ms before retry ${attempt + 2}/${retries}...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      
+      // For non-rate-limit errors or final attempt, log and return empty
+      if (attempt === retries - 1) {
+        console.warn(`  ⚠️  Failed to generate embedding after ${retries} attempts: ${errorMessage}`);
+        return [];
+      }
     }
-
-    return result.embedding.values;
-  } catch (error) {
-    console.warn(`Failed to generate embedding: ${error instanceof Error ? error.message : String(error)}`);
-    return [];
   }
+  
+  return [];
 }
 
 /**
@@ -265,28 +269,39 @@ function extractFundingStage(text: string): string {
 }
 
 /**
+ * Parse article date from various sources (URL, date field, etc.)
+ */
+function parseArticleDate(article: TechCrunchArticle): Date {
+  // Try to parse date from URL first (most reliable)
+  if (article.link) {
+    const urlMatch = article.link.match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
+    if (urlMatch) {
+      const [, year, month, day] = urlMatch;
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+  }
+  
+  // Try to parse from date field
+  if (article.date) {
+    const parsed = new Date(article.date);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  
+  // Fallback to current date
+  return new Date();
+}
+
+/**
  * Extract date
  */
 function extractDate(article: TechCrunchArticle): string {
-  if (article.date) {
-    return article.date;
-  }
-  
-  const content = article.content || article.description || '';
-  const datePatterns = [
-    /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i,
-    /\b\d{1,2}\/(\d{1,2})\/\d{4}\b/,
-    /\b\d{4}-\d{2}-\d{2}\b/,
-  ];
-
-  for (const pattern of datePatterns) {
-    const match = content.match(pattern);
-    if (match) {
-      return match[0];
-    }
-  }
-
-  return new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+  const date = parseArticleDate(article);
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 /**
@@ -411,9 +426,131 @@ function extractWebsite(companyName: string, text: string): string {
 }
 
 /**
- * Parse article to startup data
+ * Extract structured startup data from article using Gemini
  */
-function parseArticleToStartup(article: TechCrunchArticle): StartupData | null {
+async function extractStartupDataWithGemini(article: TechCrunchArticle): Promise<StartupData | null> {
+  if (!genAI) {
+    console.warn('  ⚠️  Gemini API not available, falling back to regex extraction');
+    return parseArticleToStartupRegex(article);
+  }
+
+  try {
+    const articleText = `
+Title: ${article.title || ''}
+Content: ${(article.content || article.description || '').substring(0, 4000)}
+Link: ${article.link || ''}
+Date: ${article.date || ''}
+`.trim();
+
+    const prompt = `Extract structured startup funding information from this TechCrunch article. Return ONLY valid JSON, no markdown, no explanation.
+
+Article:
+${articleText}
+
+Extract the following information:
+- Company_Name: The name of the startup/company (required, must be exact)
+- funding_stage: Seed, Series A, Series B, Series C, Series D, Bridge, IPO, or "Seed" if unclear
+- amount_raised: Funding amount in format like "$5M", "$10.5M", "$2.5B", or null if not mentioned
+- date_raised: Date of funding announcement (format: "Month Year" or "YYYY-MM-DD" or article date)
+- location: City, State/Country (e.g., "San Francisco, CA" or "London, UK") or empty string
+- industry: Primary industry (e.g., "Artificial Intelligence", "Fintech", "Healthcare", "SaaS") or empty string
+- business_type: "B2B", "Consumer", "Marketplace", "Platform", or "B2B" if unclear
+- website: Company website domain (without http://) or empty string
+- company_description: First 2-3 sentences summarizing what the company does (max 500 chars)
+
+Return JSON in this exact format:
+{
+  "Company_Name": "string or null",
+  "funding_stage": "string",
+  "amount_raised": "string or null",
+  "date_raised": "string",
+  "location": "string",
+  "industry": "string",
+  "business_type": "string",
+  "website": "string",
+  "company_description": "string"
+}
+
+If no company name can be identified, return null.`;
+
+    // Try different model names in order of preference
+    // Using newer Gemini 2.x models as 1.5 models may have compatibility issues
+    const modelNames = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    let result = null;
+    let lastError: any = null;
+    
+    for (const modelName of modelNames) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent(prompt);
+        // If we get here, the model worked
+        break;
+      } catch (error: any) {
+        lastError = error;
+        // If it's a model not found error (404), try the next model
+        if (error?.message?.includes('not found') || error?.message?.includes('404')) {
+          console.warn(`  ⚠️  Model ${modelName} not available, trying next model...`);
+          continue;
+        }
+        // For other errors (parsing, validation, etc.), re-throw immediately
+        throw error;
+      }
+    }
+    
+    if (!result) {
+      throw new Error(`All Gemini models failed. Last error: ${lastError?.message || 'Unknown error'}`);
+    }
+    const response = result.response;
+    const text = response.text();
+    
+    // Extract JSON from response (handle markdown code blocks)
+    let jsonText = text.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+    
+    const extracted = JSON.parse(jsonText);
+    
+    // Validate that we have a company name
+    if (!extracted.Company_Name || extracted.Company_Name === 'null') {
+      return null;
+    }
+
+    // Use full article content for description (better for embeddings)
+    const fullDescription = article.content || article.description || article.title || '';
+    const description = fullDescription.length > 1000 
+      ? fullDescription.substring(0, 1000) + '...'
+      : fullDescription;
+
+    // Use Gemini's extracted data directly - it's more accurate than regex
+    // Only use regex helpers as absolute last resort if Gemini returns empty/null
+    return {
+      Company_Name: extracted.Company_Name,
+      company_description: extracted.company_description || description.substring(0, 500),
+      business_type: extracted.business_type || 'B2B',
+      industry: extracted.industry || '',
+      location: extracted.location || '',
+      // Use Gemini's website extraction, only fall back to regex if completely empty
+      website: extracted.website || (extracted.Company_Name ? extractWebsite(extracted.Company_Name, article.content || '') : ''),
+      funding_stage: extracted.funding_stage || 'Seed',
+      amount_raised: extracted.amount_raised || '$1.5M',
+      // Use Gemini's date extraction, only fall back to regex if completely empty
+      date_raised: extracted.date_raised || extractDate(article),
+      techcrunch_article_link: article.link || '',
+      techcrunch_article_content: article.content || article.description || '',
+    };
+  } catch (error) {
+    console.warn(`  ⚠️  Gemini extraction failed, falling back to regex: ${error instanceof Error ? error.message : String(error)}`);
+    return parseArticleToStartupRegex(article);
+  }
+}
+
+/**
+ * Parse article to startup data using regex (fallback)
+ */
+function parseArticleToStartupRegex(article: TechCrunchArticle): StartupData | null {
   const companyName = extractCompanyName(article);
   if (!companyName) {
     return null;
@@ -428,9 +565,16 @@ function parseArticleToStartup(article: TechCrunchArticle): StartupData | null {
   const businessType = extractBusinessType(content);
   const website = extractWebsite(companyName, content);
 
+  // Use full article content for description (better for embeddings)
+  // Take first 1000 chars for description, but keep full content for article_content
+  const fullDescription = article.content || article.description || article.title || '';
+  const description = fullDescription.length > 1000 
+    ? fullDescription.substring(0, 1000) + '...'
+    : fullDescription;
+
   return {
     Company_Name: companyName,
-    company_description: article.description || article.title || '',
+    company_description: description,
     business_type: businessType,
     industry: industry,
     location: location,
@@ -451,80 +595,302 @@ function generateFundingRoundId(startupName: string, dateRaised: string): string
 }
 
 /**
- * Scrape TechCrunch category page using Puppeteer
+ * Check if URL is a valid article URL (not category/tag page)
  */
-async function scrapeCategoryPage(page: Page, category: string): Promise<TechCrunchArticle[]> {
-  const url = `https://techcrunch.com/category/${category}/`;
+function isValidArticleUrl(url: string): boolean {
+  if (!url || !url.includes('techcrunch.com')) return false;
+  
+  // Filter out category, tag, and other non-article pages
+  const invalidPatterns = [
+    '/category/',
+    '/tag/',
+    '/author/',
+    '/page/',
+    '/search/',
+    '/about/',
+    '/contact/',
+    '/privacy/',
+    '/terms/',
+    '/newsletters/',
+    '/events/',
+    '/advertise/',
+  ];
+  
+  // Must be a date-based article URL (e.g., /2025/11/22/article-name/)
+  const hasDatePattern = /\/(\d{4})\/(\d{2})\/(\d{2})\//.test(url);
+  
+  return hasDatePattern && !invalidPatterns.some(pattern => url.includes(pattern));
+}
+
+/**
+ * Scrape TechCrunch category page using Puppeteer with pagination support
+ */
+async function scrapeCategoryPage(page: Page, category: string, pageNum: number = 1): Promise<TechCrunchArticle[]> {
+  const url = pageNum === 1 
+    ? `https://techcrunch.com/category/${category}/`
+    : `https://techcrunch.com/category/${category}/page/${pageNum}/`;
   
   try {
     console.log(`   Navigating to: ${url}`);
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
     
-    // Wait for articles to load
-    await page.waitForSelector('article, .post-block, .river-block', { timeout: 10000 }).catch(() => {});
+    // Scroll down to load more content (TechCrunch may lazy-load)
+    await page.evaluate(() => {
+      window.scrollTo(0, document.body.scrollHeight / 2);
+    });
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Extract article links and basic info
+    await page.evaluate(() => {
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Wait for articles to load - try multiple selectors for modern TechCrunch
+    await page.waitForSelector('article, a[href*="/202"], .post-block, .river-block, [data-module="ArticleListItem"]', { timeout: 10000 }).catch(() => {});
+    
+    // Small delay to ensure all content is loaded
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Extract article links and basic info with date parsing
+    // TechCrunch uses various structures, so we'll look for article links directly
     const articles = await page.evaluate(() => {
-      const articleElements = document.querySelectorAll('article, .post-block, .river-block, [class*="post"]');
       const results: any[] = [];
       
-      articleElements.forEach((element) => {
-        const linkEl = element.querySelector('a[href*="/"]');
-        const titleEl = element.querySelector('h2, h3, .post-title, [class*="title"]');
-        const descEl = element.querySelector('p, .excerpt, [class*="excerpt"], [class*="summary"]');
-        const dateEl = element.querySelector('time, [datetime], .date');
+      // Strategy 1: Find all links that match article URL pattern (most reliable)
+      const allLinks = document.querySelectorAll('a[href*="/202"]');
+      const seenUrls = new Set<string>();
+      
+      allLinks.forEach((linkEl) => {
+        const href = linkEl.getAttribute('href');
+        if (!href) return;
         
-        if (linkEl) {
-          const href = linkEl.getAttribute('href');
-          const fullUrl = href?.startsWith('http') ? href : `https://techcrunch.com${href}`;
+        const fullUrl = href.startsWith('http') ? href : `https://techcrunch.com${href}`;
+        
+        // Only include if it looks like an article URL and we haven't seen it
+        if (fullUrl && /\/(\d{4})\/(\d{2})\/(\d{2})\//.test(fullUrl) && !seenUrls.has(fullUrl)) {
+          seenUrls.add(fullUrl);
           
-          results.push({
-            title: titleEl?.textContent?.trim() || '',
-            link: fullUrl,
-            description: descEl?.textContent?.trim() || '',
-            date: dateEl?.getAttribute('datetime') || dateEl?.textContent?.trim() || '',
-          });
+          // Extract date from URL (format: /2025/11/22/)
+          const dateMatch = fullUrl.match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
+          let articleDate = '';
+          if (dateMatch) {
+            const [, year, month, day] = dateMatch;
+            articleDate = `${year}-${month}-${day}`;
+          }
+          
+          // Find the article container (parent or nearby)
+          let container = linkEl.closest('article') || 
+                         linkEl.closest('[class*="post"]') || 
+                         linkEl.closest('[class*="article"]') ||
+                         linkEl.parentElement;
+          
+          // Try to find title - could be in the link itself or nearby
+          let titleEl = linkEl.querySelector('h2, h3, h4') || 
+                       container?.querySelector('h2, h3, h4, [class*="title"]') ||
+                       (linkEl.textContent?.trim() ? linkEl : null);
+          
+          // Try to find description/excerpt
+          const descEl = container?.querySelector('p, [class*="excerpt"], [class*="summary"], [class*="description"]') ||
+                        linkEl.nextElementSibling?.querySelector('p');
+          
+          // Try to find date
+          const dateEl = container?.querySelector('time[datetime], [datetime], [class*="date"]') ||
+                        linkEl.parentElement?.querySelector('time, [datetime]');
+          
+          const title = titleEl?.textContent?.trim() || linkEl.textContent?.trim() || '';
+          
+          // Only add if we have a title (indicates it's a real article link)
+          if (title && title.length > 10) {
+            results.push({
+              title: title,
+              link: fullUrl,
+              description: descEl?.textContent?.trim() || '',
+              date: dateEl?.getAttribute('datetime') || articleDate || dateEl?.textContent?.trim() || '',
+              dateFromUrl: articleDate, // Store parsed date for sorting
+            });
+          }
+        }
+      });
+      
+      // Strategy 2: Also check article elements (fallback)
+      const articleElements = document.querySelectorAll('article, [class*="post"], [data-module="ArticleListItem"]');
+      articleElements.forEach((element) => {
+        const linkEl = element.querySelector('a[href*="/202"]');
+        if (!linkEl) return;
+        
+        const href = linkEl.getAttribute('href');
+        if (!href) return;
+        
+        const fullUrl = href.startsWith('http') ? href : `https://techcrunch.com${href}`;
+        
+        // Skip if we already have this URL
+        if (results.some(r => r.link === fullUrl)) return;
+        
+        // Only include if it looks like an article URL
+        if (fullUrl && /\/(\d{4})\/(\d{2})\/(\d{2})\//.test(fullUrl)) {
+          const dateMatch = fullUrl.match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
+          let articleDate = '';
+          if (dateMatch) {
+            const [, year, month, day] = dateMatch;
+            articleDate = `${year}-${month}-${day}`;
+          }
+          
+          const titleEl = element.querySelector('h2, h3, h4, [class*="title"]') || linkEl;
+          const descEl = element.querySelector('p, [class*="excerpt"], [class*="summary"]');
+          const dateEl = element.querySelector('time[datetime], [datetime], [class*="date"]');
+          
+          const title = titleEl?.textContent?.trim() || '';
+          
+          if (title && title.length > 10) {
+            results.push({
+              title: title,
+              link: fullUrl,
+              description: descEl?.textContent?.trim() || '',
+              date: dateEl?.getAttribute('datetime') || articleDate || dateEl?.textContent?.trim() || '',
+              dateFromUrl: articleDate,
+            });
+          }
         }
       });
       
       return results;
     });
     
-    console.log(`   Found ${articles.length} articles on category page`);
-    return articles;
+    // Filter out invalid URLs
+    const validArticles = articles.filter(article => isValidArticleUrl(article.link));
+    
+    // Remove duplicates by URL
+    const uniqueArticles = Array.from(
+      new Map(validArticles.map(article => [article.link, article])).values()
+    );
+    
+    // Log first few articles for debugging
+    if (uniqueArticles.length > 0) {
+      console.log(`   Sample articles found:`);
+      uniqueArticles.slice(0, 3).forEach((article, i) => {
+        console.log(`     ${i + 1}. ${article.title.substring(0, 60)}... (${article.dateFromUrl || 'no date'})`);
+      });
+    }
+    
+    console.log(`   Found ${uniqueArticles.length} unique valid articles on page ${pageNum} (${articles.length} total, ${validArticles.length} valid)`);
+    return uniqueArticles;
   } catch (error) {
-    console.error(`   Error scraping category page ${category}:`, error);
+    console.error(`   Error scraping category page ${category} (page ${pageNum}):`, error);
     return [];
   }
 }
 
 /**
- * Scrape individual article page to get full content
+ * Check if there are more pages available
  */
-async function scrapeArticlePage(page: Page, articleLink: string): Promise<TechCrunchArticle | null> {
+async function hasMorePages(page: Page): Promise<boolean> {
   try {
-    await page.goto(articleLink, { waitUntil: 'networkidle2', timeout: 30000 });
+    const hasNext = await page.evaluate(() => {
+      // Look for "Next" button or pagination links
+      const nextButton = document.querySelector('a[rel="next"], .pagination a:last-child, [class*="next"]');
+      return nextButton !== null && nextButton.textContent?.toLowerCase().includes('next');
+    });
+    return hasNext;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get already scraped article links from Supabase
+ */
+async function getAlreadyScrapedArticleLinks(): Promise<Set<string>> {
+  try {
+    const { data, error } = await supabase
+      .from('startups')
+      .select('techcrunch_article_link')
+      .not('techcrunch_article_link', 'is', null);
     
-    // Wait for article content
-    await page.waitForSelector('article, .article-content, .entry-content', { timeout: 10000 }).catch(() => {});
+    if (error) {
+      console.warn('  ⚠️  Could not fetch already-scraped articles:', error);
+      return new Set();
+    }
     
-    const articleData = await page.evaluate(() => {
+    const links = new Set<string>();
+    data?.forEach((row: any) => {
+      if (row.techcrunch_article_link) {
+        links.add(row.techcrunch_article_link);
+      }
+    });
+    
+    return links;
+  } catch (error) {
+    console.warn('  ⚠️  Error fetching already-scraped articles:', error);
+    return new Set();
+  }
+}
+
+/**
+ * Scrape individual article page to get full content
+ * Uses a new page to avoid frame detachment issues
+ */
+async function scrapeArticlePage(browser: Browser, articleLink: string): Promise<TechCrunchArticle | null> {
+  // Validate URL first
+  if (!isValidArticleUrl(articleLink)) {
+    return null;
+  }
+  
+  let articlePage: Page | null = null;
+  
+  try {
+    // Create a new page for each article to avoid frame detachment
+    articlePage = await browser.newPage();
+    await articlePage.setViewport({ width: 1920, height: 1080 });
+    await articlePage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    
+    // Navigate with shorter timeout and more lenient wait condition
+    await articlePage.goto(articleLink, { 
+      waitUntil: 'domcontentloaded', 
+      timeout: 20000 
+    });
+    
+    // Wait for article content with shorter timeout
+    await articlePage.waitForSelector('article, .article-content, .entry-content, h1', { timeout: 5000 }).catch(() => {});
+    
+    // Small delay to ensure content is loaded
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const articleData = await articlePage.evaluate(() => {
       const titleEl = document.querySelector('h1, .article-title, .entry-title');
-      const contentEl = document.querySelector('article .article-content, .entry-content, article p');
       const authorEl = document.querySelector('.author, [rel="author"], .byline');
       const dateEl = document.querySelector('time[datetime], .article-date, .published-date');
       
-      // Get all paragraph text for content
-      const paragraphs = Array.from(document.querySelectorAll('article p, .article-content p, .entry-content p'))
-        .map(p => p.textContent?.trim())
-        .filter(Boolean)
-        .join('\n\n');
+      // Get all paragraph text for content - try multiple selectors for comprehensive extraction
+      const contentSelectors = [
+        'article p',
+        '.article-content p',
+        '.entry-content p',
+        '[class*="article"] p',
+        '[class*="content"] p',
+        'main p',
+      ];
+      
+      const allParagraphs: string[] = [];
+      contentSelectors.forEach(selector => {
+        const paragraphs = Array.from(document.querySelectorAll(selector))
+          .map(p => p.textContent?.trim())
+          .filter(Boolean)
+          .filter(text => text.length > 20); // Filter out very short text (likely navigation/ads)
+        allParagraphs.push(...paragraphs);
+      });
+      
+      // Remove duplicates while preserving order
+      const uniqueParagraphs = Array.from(new Set(allParagraphs));
+      const fullContent = uniqueParagraphs.join('\n\n');
+      
+      // Get first paragraph as description (usually the summary)
+      const description = uniqueParagraphs[0] || fullContent.substring(0, 500) || '';
       
       return {
         title: titleEl?.textContent?.trim() || '',
         link: window.location.href,
-        description: paragraphs.substring(0, 500) || '',
-        content: paragraphs || '',
+        description: description.substring(0, 500) || '',
+        content: fullContent || '',
         author: authorEl?.textContent?.trim() || '',
         date: dateEl?.getAttribute('datetime') || dateEl?.textContent?.trim() || '',
       };
@@ -532,8 +898,17 @@ async function scrapeArticlePage(page: Page, articleLink: string): Promise<TechC
     
     return articleData;
   } catch (error) {
-    console.warn(`   Could not scrape article ${articleLink}:`, error);
+    // Silently handle errors - we'll just skip this article
     return null;
+  } finally {
+    // Always close the page to prevent resource leaks
+    if (articlePage) {
+      try {
+        await articlePage.close();
+      } catch (closeError) {
+        // Ignore close errors
+      }
+    }
   }
 }
 
@@ -565,31 +940,109 @@ async function scrapeTagPage(page: Page, tag: string): Promise<TechCrunchArticle
           const href = linkEl.getAttribute('href');
           const fullUrl = href?.startsWith('http') ? href : `https://techcrunch.com${href}`;
           
-          results.push({
-            title: titleEl?.textContent?.trim() || '',
-            link: fullUrl,
-            description: descEl?.textContent?.trim() || '',
-            date: dateEl?.getAttribute('datetime') || dateEl?.textContent?.trim() || '',
-          });
+          // Only include if it looks like an article URL
+          if (fullUrl && /\/(\d{4})\/(\d{2})\/(\d{2})\//.test(fullUrl)) {
+            results.push({
+              title: titleEl?.textContent?.trim() || '',
+              link: fullUrl,
+              description: descEl?.textContent?.trim() || '',
+              date: dateEl?.getAttribute('datetime') || dateEl?.textContent?.trim() || '',
+            });
+          }
         }
       });
       
       return results;
     });
     
-    console.log(`   Found ${articles.length} articles on tag page`);
-    return articles;
+    // Filter out invalid URLs
+    const validArticles = articles.filter(article => isValidArticleUrl(article.link));
+    
+    console.log(`   Found ${validArticles.length} valid articles on tag page (${articles.length} total)`);
+    return validArticles;
   } catch (error) {
     console.error(`   Error scraping tag page ${tag}:`, error);
     return [];
   }
 }
 
+// Execution lock to prevent overlapping runs
+let isScraping = false;
+let lastRunTime = 0;
+
+/**
+ * Check if current time is within TechCrunch's active publishing hours
+ * TechCrunch typically publishes during US business hours (6 AM - 10 PM Pacific)
+ */
+function isWithinTechCrunchHours(): boolean {
+  const now = new Date();
+  
+  // Convert to Pacific Time (TechCrunch's timezone)
+  const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  const hour = pacificTime.getHours();
+  
+  // TechCrunch publishes articles roughly between 6 AM - 10 PM Pacific
+  // This covers US business hours and evening news cycles
+  const isActive = hour >= 6 && hour < 22;
+  
+  return isActive;
+}
+
+/**
+ * Get human-readable time info
+ */
+function getTimeInfo(): string {
+  const now = new Date();
+  const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  const hour = pacificTime.getHours();
+  const minute = pacificTime.getMinutes();
+  const isActive = isWithinTechCrunchHours();
+  
+  return `Pacific Time: ${hour}:${minute.toString().padStart(2, '0')} (${isActive ? '✅ Active' : '⏸️  Inactive'})`;
+}
+
 /**
  * Main scraping and ingestion function
+ * Focus: Funding-related articles only
+ * 
+ * NOTE: Designed to run every 30 minutes during TechCrunch's active hours (6 AM - 10 PM Pacific).
+ * See SCRAPER_LIMITATIONS_10MIN.md for limitations.
  */
 async function scrapeAndIngestTechCrunch() {
-  console.log('🚀 Starting TechCrunch scraping with Supabase + Pinecone...\n');
+  // Check if within TechCrunch's active hours
+  // COMMENTED OUT FOR TESTING - Remove comments to re-enable active hours check
+  // if (!isWithinTechCrunchHours()) {
+  //   const timeInfo = getTimeInfo();
+  //   console.log(`⏸️  Outside TechCrunch publishing hours. ${timeInfo}`);
+  //   console.log('   Skipping this run. Will resume during active hours (6 AM - 10 PM Pacific).\n');
+  //   return;
+  // }
+  
+  // Prevent overlapping runs
+  if (isScraping) {
+    console.log('⚠️  Previous scraping run still in progress, skipping this run...');
+    return;
+  }
+  
+  const startTime = Date.now();
+  const timeSinceLastRun = startTime - lastRunTime;
+  
+  // Minimum interval: 25 minutes (for 30-minute schedule with buffer)
+  if (lastRunTime > 0 && timeSinceLastRun < 25 * 60 * 1000) {
+    console.log(`⚠️  Last run was ${Math.round(timeSinceLastRun / 60000)} minutes ago. Minimum interval: 25 minutes. Skipping...`);
+    return;
+  }
+  
+  isScraping = true;
+  lastRunTime = startTime;
+  
+  try {
+    const timeInfo = getTimeInfo();
+    console.log('🚀 Starting TechCrunch FUNDRAISING scraping with Supabase + Pinecone...\n');
+    console.log('📊 Source: https://techcrunch.com/category/fundraising/\n');
+    console.log('🎯 Focus: All funding announcements and startup investments\n');
+    console.log(`⏰ ${timeInfo}`);
+    console.log(`📅 Run started at: ${new Date().toISOString()}\n`);
 
   // Initialize Pinecone index if available
   if (pinecone) {
@@ -617,6 +1070,11 @@ async function scrapeAndIngestTechCrunch() {
     );
   }
 
+  // Get already-scraped articles from Supabase to avoid duplicates
+  console.log('🔍 Checking for already-scraped articles in Supabase...');
+  const alreadyScrapedLinks = await getAlreadyScrapedArticleLinks();
+  console.log(`   Found ${alreadyScrapedLinks.size} already-scraped articles\n`);
+
   const allStartups: StartupData[] = [];
   const seenCompanies = new Set<string>();
   const seenArticleLinks = new Set<string>();
@@ -636,117 +1094,142 @@ async function scrapeAndIngestTechCrunch() {
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
   try {
-    // Scrape by categories
-    console.log('📂 Scraping by categories...');
-    for (const category of STARTUP_CATEGORIES) {
+    // Scrape only the dedicated fundraising category with pagination
+    console.log('📂 Scraping TechCrunch fundraising category (with pagination)...');
+    console.log('   URL: https://techcrunch.com/category/fundraising/\n');
+    
+    let allArticles: TechCrunchArticle[] = [];
+    let pageNum = 1;
+    const maxPages = 5; // Scrape up to 5 pages (most recent articles)
+    let hasMore = true;
+    
+    // Scrape multiple pages to get recent articles
+    // Start with page 1 (most recent articles)
+    while (hasMore && pageNum <= maxPages) {
       try {
-        const articles = await scrapeCategoryPage(page, category);
+        console.log(`\n📄 Scraping page ${pageNum}...`);
+        const pageArticles = await scrapeCategoryPage(page, FUNDRAISING_CATEGORY, pageNum);
         
-        // Process each article
-        for (const article of articles) {
-          // Skip if we've already seen this article
-          if (seenArticleLinks.has(article.link || '')) {
-            continue;
-          }
-          seenArticleLinks.add(article.link || '');
-          
-          try {
-            // Scrape full article content
-            if (article.link) {
-              console.log(`   📄 Scraping article: ${article.title?.substring(0, 50)}...`);
-              const fullArticle = await scrapeArticlePage(page, article.link);
-              
-              if (fullArticle) {
-                // Merge with basic info
-                const mergedArticle = {
-                  ...article,
-                  ...fullArticle,
-                  content: fullArticle.content || article.description || '',
-                };
-                
-                const normalizedArticle = normalizeArticle(mergedArticle);
-                const startup = parseArticleToStartup(normalizedArticle);
-                
-                if (startup && !seenCompanies.has(startup.Company_Name.toLowerCase())) {
-                  seenCompanies.add(startup.Company_Name.toLowerCase());
-                  allStartups.push(startup);
-                  console.log(`   ✅ Extracted: ${startup.Company_Name}`);
-                }
-              }
-              
-              // Rate limiting - wait between articles
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-          } catch (err) {
-            console.warn(`   ⚠️  Error processing article: ${err instanceof Error ? err.message : String(err)}`);
-            continue;
-          }
+        if (pageArticles.length === 0) {
+          console.log(`   No articles found on page ${pageNum}, stopping pagination`);
+          hasMore = false;
+          break;
         }
         
-        // Wait between categories
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Add articles, avoiding duplicates
+        const existingUrls = new Set(allArticles.map(a => a.link));
+        const newArticles = pageArticles.filter(a => !existingUrls.has(a.link));
+        allArticles = allArticles.concat(newArticles);
+        
+        console.log(`   Found ${pageArticles.length} articles on this page (${newArticles.length} new, ${pageArticles.length - newArticles.length} duplicates)`);
+        console.log(`   Total unique articles collected so far: ${allArticles.length}`);
+        
+        // Check if there's a next page
+        hasMore = await hasMorePages(page);
+        pageNum++;
+        
+        // Wait between pages
+        if (hasMore && pageNum <= maxPages) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       } catch (error) {
-        console.error(`   ❌ Error scraping category ${category}:`, error);
+        console.error(`   ❌ Error scraping page ${pageNum}:`, error);
+        hasMore = false;
       }
     }
-
-    // Scrape by tags
-    console.log('\n🏷️  Scraping by tags...');
-    for (const tag of STARTUP_TAGS) {
+    
+    console.log(`\n📊 Found ${allArticles.length} total funding articles across ${pageNum - 1} page(s)\n`);
+    
+    // Sort articles by date (newest first)
+    allArticles.sort((a, b) => {
+      const dateA = parseArticleDate(a);
+      const dateB = parseArticleDate(b);
+      return dateB.getTime() - dateA.getTime(); // Newest first
+    });
+    
+    console.log(`📅 Sorted articles by date (newest first)`);
+    if (allArticles.length > 0) {
+      const newestDate = parseArticleDate(allArticles[0]);
+      const oldestDate = parseArticleDate(allArticles[allArticles.length - 1]);
+      console.log(`   Newest: ${newestDate.toISOString().split('T')[0]}`);
+      console.log(`   Oldest: ${oldestDate.toISOString().split('T')[0]}\n`);
+    }
+    
+    // Filter out already-scraped articles
+    const newArticles = allArticles.filter(article => {
+      const link = article.link || '';
+      return !alreadyScrapedLinks.has(link) && !seenArticleLinks.has(link);
+    });
+    
+    console.log(`📋 Filtered to ${newArticles.length} new articles (${allArticles.length - newArticles.length} already scraped)\n`);
+    
+    if (newArticles.length === 0) {
+      console.log('✅ No new articles to scrape! All articles have already been processed.');
+      return;
+    }
+    
+    // Process each new article
+    for (let i = 0; i < newArticles.length; i++) {
+      const article = newArticles[i];
+      
+      seenArticleLinks.add(article.link || '');
+      
       try {
-        const articles = await scrapeTagPage(page, tag);
-        
-        // Process each article
-        for (const article of articles) {
-          // Skip if we've already seen this article
-          if (seenArticleLinks.has(article.link || '')) {
-            continue;
-          }
-          seenArticleLinks.add(article.link || '');
+        // Scrape full article content
+        if (article.link && isValidArticleUrl(article.link)) {
+          console.log(`[${i + 1}/${newArticles.length}] 📄 Scraping: ${article.title?.substring(0, 60)}...`);
+          const fullArticle = await scrapeArticlePage(browser, article.link);
           
-          try {
-            // Scrape full article content
-            if (article.link) {
-              console.log(`   📄 Scraping article: ${article.title?.substring(0, 50)}...`);
-              const fullArticle = await scrapeArticlePage(page, article.link);
-              
-              if (fullArticle) {
-                // Merge with basic info
-                const mergedArticle = {
-                  ...article,
-                  ...fullArticle,
-                  content: fullArticle.content || article.description || '',
-                };
-                
-                const normalizedArticle = normalizeArticle(mergedArticle);
-                const startup = parseArticleToStartup(normalizedArticle);
-                
-                if (startup && !seenCompanies.has(startup.Company_Name.toLowerCase())) {
-                  seenCompanies.add(startup.Company_Name.toLowerCase());
-                  allStartups.push(startup);
-                  console.log(`   ✅ Extracted: ${startup.Company_Name}`);
-                }
-              }
-              
-              // Rate limiting - wait between articles
-              await new Promise(resolve => setTimeout(resolve, 1000));
+          if (fullArticle) {
+            // Merge with basic info
+            const mergedArticle = {
+              ...article,
+              ...fullArticle,
+              content: fullArticle.content || article.description || '',
+            };
+            
+            const normalizedArticle = normalizeArticle(mergedArticle);
+            
+            // Use Gemini to extract startup data
+            console.log(`   🤖 Extracting data with Gemini...`);
+            const startup = await extractStartupDataWithGemini(normalizedArticle);
+            
+            if (startup && !seenCompanies.has(startup.Company_Name.toLowerCase())) {
+              seenCompanies.add(startup.Company_Name.toLowerCase());
+              allStartups.push(startup);
+              console.log(`   ✅ Extracted: ${startup.Company_Name} (${startup.funding_stage} - ${startup.amount_raised})`);
+            } else if (startup) {
+              console.log(`   ⏭️  Duplicate company: ${startup.Company_Name} (skipped)`);
+            } else {
+              console.log(`   ⚠️  Could not extract company name`);
             }
-          } catch (err) {
-            console.warn(`   ⚠️  Error processing article: ${err instanceof Error ? err.message : String(err)}`);
-            continue;
           }
+          
+          // Rate limiting - wait between articles and Gemini API calls
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
-        
-        // Wait between tags
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      } catch (error) {
-        console.error(`   ❌ Error scraping tag ${tag}:`, error);
+      } catch (err) {
+        // Silently continue on errors
+        continue;
       }
     }
   } finally {
-    // Close browser
-    await browser.close();
-    console.log('🌐 Browser closed');
+    // Close browser with better error handling for Windows
+    try {
+      const pages = await browser.pages();
+      for (const p of pages) {
+        try {
+          await p.close();
+        } catch (e) {
+          // Ignore page close errors
+        }
+      }
+      await browser.close();
+      console.log('🌐 Browser closed');
+    } catch (closeError) {
+      // On Windows, sometimes temp files are locked - this is okay
+      console.warn('⚠️  Browser cleanup warning (this is usually safe to ignore):', closeError instanceof Error ? closeError.message : String(closeError));
+    }
   }
 
   console.log(`\n💾 Ingesting ${allStartups.length} startups into Supabase + Pinecone...\n`);
@@ -760,12 +1243,23 @@ async function scrapeAndIngestTechCrunch() {
     try {
       console.log(`[${i + 1}/${allStartups.length}] Processing: ${startup.Company_Name}`);
 
-      // Generate embedding
+      // Generate embedding - include all relevant data for better matching
       const description = startup.company_description || '';
       const tags = startup.business_type && startup.industry 
         ? `${startup.business_type}, ${startup.industry}` 
         : startup.business_type || startup.industry || '';
-      const embeddingText = `${description}\nTags: ${tags}`;
+      
+      // Include more context in embedding for better semantic search
+      const embeddingParts = [
+        description,
+        startup.Company_Name ? `Company: ${startup.Company_Name}` : '',
+        startup.funding_stage ? `Funding Stage: ${startup.funding_stage}` : '',
+        startup.amount_raised ? `Funding Amount: ${startup.amount_raised}` : '',
+        startup.location ? `Location: ${startup.location}` : '',
+        tags ? `Tags: ${tags}` : '',
+      ].filter(Boolean);
+      
+      const embeddingText = embeddingParts.join('\n');
 
       console.log('  Generating embedding...');
       const embedding = await generateEmbedding(embeddingText);
@@ -826,6 +1320,11 @@ async function scrapeAndIngestTechCrunch() {
           industry: startup.industry || '',
           description: description,
           keywords: keywords,
+          business_type: startup.business_type || '',
+          location: startup.location || '',
+          funding_stage: startup.funding_stage || '',
+          funding_amount: startup.amount_raised || '',
+          website: startup.website || '',
         });
       }
 
@@ -842,10 +1341,18 @@ async function scrapeAndIngestTechCrunch() {
     }
   }
 
-  console.log(`\n=== Scraping and Ingestion Complete ===`);
-  console.log(`Total scraped: ${allStartups.length}`);
-  console.log(`Successfully ingested: ${successCount}`);
-  console.log(`Errors: ${errorCount}`);
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    
+    console.log(`\n=== Scraping and Ingestion Complete ===`);
+    console.log(`Total scraped: ${allStartups.length}`);
+    console.log(`Successfully ingested: ${successCount}`);
+    console.log(`Errors: ${errorCount}`);
+    console.log(`⏱️  Execution time: ${duration}s`);
+    console.log(`⏰ Run completed at: ${new Date().toISOString()}\n`);
+  } finally {
+    isScraping = false;
+  }
 }
 
 // Run the scraper

@@ -6,6 +6,7 @@ config({ path: resolve(process.cwd(), '.env.local') });
 import { parse } from 'csv-parse/sync';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { randomUUID } from 'crypto';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -274,9 +275,13 @@ async function ingestCSV() {
       console.log('  Creating startup in Supabase...');
       const pineconeId = `startup-${row.Company_Name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
       
+      // Generate a unique ID (schema requires TEXT id with no default)
+      const startupId = randomUUID();
+      
       // Prepare insert data with validation
       // Only include columns that exist in the schema to avoid errors
       const insertData: any = {
+        id: startupId, // Required: schema has TEXT id with no default
         name: row.Company_Name?.trim() || null,
         funding_amount: row.amount_raised?.trim() || null,
         job_openings: row.job_openings?.trim() || null,
@@ -307,6 +312,8 @@ async function ingestCSV() {
       // Combine all data
       const finalInsertData = { ...insertData, ...founderColumns };
 
+      // Note: id is required and already set above (schema has TEXT id with no default)
+      
       // Try inserting with all columns first
       let { data: startupData, error: startupError } = await supabase
         .from('startups')
@@ -318,20 +325,34 @@ async function ingestCSV() {
       if (startupError && (
         startupError.message?.includes('Could not find') || 
         startupError.message?.includes('column') ||
-        startupError.message?.includes('schema cache')
+        startupError.message?.includes('schema cache') ||
+        startupError.message?.includes('null value') && startupError.message?.includes('id')
       )) {
-        console.log('  Column missing in schema, retrying with minimal columns...');
-        // Only include name (required) and columns that definitely exist
+        console.log('  Column issue detected, retrying with minimal columns...');
+        // Only include name (required) and id (required)
         const minimalData: any = {
+          id: finalInsertData.id, // Required: schema has TEXT id with no default
           name: finalInsertData.name,
         };
         
         // Try to add other columns one by one, but only if they're not the problematic one
         const problematicColumn = startupError.message?.match(/column '(\w+)'/)?.[1];
         
+        // List of safe columns that should always exist
+        const safeColumns = ['funding_amount', 'job_openings', 'round_type', 'date', 'location', 'website', 'industry', 'keywords', 'description', 'pinecone_id'];
+        
         Object.keys(finalInsertData).forEach(key => {
-          if (key !== 'name' && key !== problematicColumn && finalInsertData[key] !== null) {
-            minimalData[key] = finalInsertData[key];
+          // Skip id, name, problematic column, and null values
+          if (key !== 'id' && 
+              key !== 'name' && 
+              key !== problematicColumn && 
+              finalInsertData[key] !== null && 
+              finalInsertData[key] !== undefined &&
+              finalInsertData[key] !== '') {
+            // Only include if it's a safe column or a founder column
+            if (safeColumns.includes(key) || key.startsWith('founder_')) {
+              minimalData[key] = finalInsertData[key];
+            }
           }
         });
         
