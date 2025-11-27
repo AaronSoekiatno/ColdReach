@@ -12,19 +12,29 @@
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "ingest": "tsx scripts/ingest-csv.ts",
+    "ingest-supabase": "tsx scripts/ingest-csv-supabase.ts",
+    "scrape-techcrunch": "tsx yc_companies/scrape_techcrunch.ts",
+    "test-scrape-techcrunch": "tsx yc_companies/test_scrape_techcrunch.ts",
+    "scrape-and-ingest-techcrunch": "tsx yc_companies/scrape_and_ingest_techcrunch.ts",
+    "scrape-techcrunch-supabase": "tsx yc_companies/scrape_techcrunch_supabase_pinecone.ts",
+    "enrich-startups": "tsx yc_companies/enrich_startup_data.ts",
+    "enrich-startup": "tsx yc_companies/enrich_startup_data.ts --id=",
     "type-check": "tsc --noEmit",
     "clean": "powershell -ExecutionPolicy Bypass -File scripts/clean.ps1"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@pinecone-database/pinecone": "^6.1.3",
     "@supabase/supabase-js": "^2.84.0",
     "csv-parse": "^6.1.0",
     "dotenv": "^17.2.3",
     "helix-ts": "^1.0.8",
     "mammoth": "^1.11.0",
     "next": "16.0.3",
+    "puppeteer": "^24.31.0",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "techcrunch-api": "^1.1.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

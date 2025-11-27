@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true
+  },
+  "imports": {
+    "std/": "https://deno.land/std@0.168.0/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "@pinecone-database/pinecone": "https://esm.sh/@pinecone-database/pinecone@1.1.2",
+    "@google/generative-ai": "https://esm.sh/@google/generative-ai@0.24.1"
+  }
+}
+
