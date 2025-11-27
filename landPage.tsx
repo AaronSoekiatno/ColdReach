@@ -17,6 +17,12 @@ import {
 } from "@/components/ui/dialog";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const SAMPLE_MATCHED_STARTUPS = [
   "Anthropic",
@@ -170,15 +176,34 @@ export const Hero = () => {
         {/* Sign In Button / Account Indicator */}
         <div className="absolute top-8 right-8 z-20">
           {user ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-white/30 bg-white/10 px-4 py-2 text-white">
-              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center font-semibold">
-                {user.email?.[0]?.toUpperCase() ?? "U"}
-              </div>
-              <div className="text-sm">
-                <p className="font-semibold">{user.email}</p>
-                <p className="text-xs text-white/60">Signed in</p>
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 rounded-2xl border border-white/30 bg-white/10 px-4 py-2 text-white transition hover:border-white/50 focus:outline-none focus:ring-2 focus:ring-white/40">
+                  <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center font-semibold">
+                    {user.email?.[0]?.toUpperCase() ?? "U"}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold">{user.email}</p>
+                    <p className="text-xs text-white/60">Signed in</p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[200px]">
+                <DropdownMenuItem
+                  className="cursor-pointer text-white"
+                  onSelect={async () => {
+                    await supabase.auth.signOut();
+                    setUser(null);
+                    toast({
+                      title: "Signed out",
+                      description: "You have been signed out successfully.",
+                    });
+                  }}
+                >
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <Button 
               variant="outline" 
