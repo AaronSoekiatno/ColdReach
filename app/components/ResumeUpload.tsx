@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
+import { Upload, FileText, X } from 'lucide-react';
 
 interface FilePreview {
   file: File;
@@ -148,195 +149,163 @@ export default function ResumeUpload() {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-6">
-      <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        <div className="p-8">
-          <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50 mb-2">
-            Upload Your Resume
-          </h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
-            Upload your resume in PDF or DOCX format (max 10MB)
-          </p>
+    <div className="w-full">
 
-          {!file ? (
-            <div
-              onClick={handleClick}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`
-                relative border-2 border-dashed rounded-lg p-12 text-center cursor-pointer
-                transition-all duration-200
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        onChange={handleFileInputChange}
+        className="hidden"
+      />
+
+      {!file ? (
+        <div
+          onClick={handleClick}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`
+            relative border-2 border-dashed rounded-2xl p-12 md:p-16 text-center cursor-pointer
+            transition-all duration-300 group
+            ${isDragging
+              ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 scale-[1.02]'
+              : 'border-foreground/20 hover:border-foreground/40 hover:bg-background/20'
+            }
+          `}
+        >
+          <div className="flex flex-col items-center gap-6">
+            <div className={`
+              w-16 h-16 rounded-full flex items-center justify-center
+              transition-all duration-300
+              ${isDragging
+                ? 'bg-blue-500/10 scale-110'
+                : 'bg-foreground/5 group-hover:bg-foreground/10 group-hover:scale-110'
+              }
+            `}>
+              <Upload className={`
+                h-8 w-8 transition-all duration-300
                 ${isDragging
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
-                  : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-foreground/60 group-hover:text-foreground'
                 }
-              `}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={handleFileInputChange}
-                className="hidden"
+              `} />
+            </div>
+            <div>
+              <p className="text-xl md:text-2xl font-semibold text-foreground mb-2">
+                {isDragging ? 'Drop your file here' : 'Send Resume'}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                PDF or DOCX format (max 10MB)
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="border border-foreground/10 rounded-2xl p-6 bg-background/30 backdrop-blur-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4 flex-1">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-lg font-semibold text-foreground truncate">
+                    {file.file.name}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {formatFileSize(file.file.size)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleRemove}
+                className="p-2 rounded-lg hover:bg-foreground/10 transition-colors"
+                aria-label="Remove file"
+              >
+                <X className="w-5 h-5 text-foreground/60" />
+              </button>
+            </div>
+          </div>
+
+          {file.file.type === 'application/pdf' && file.preview && (
+            <div className="border border-foreground/10 rounded-2xl overflow-hidden bg-background/20">
+              <iframe
+                src={file.preview}
+                className="w-full h-96"
+                title="PDF Preview"
               />
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                  <svg
-                    className="w-6 h-6 text-zinc-600 dark:text-zinc-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                    {isDragging ? 'Drop your file here' : 'Drag and drop your resume'}
-                  </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
-                    or click to browse
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-zinc-50 dark:bg-zinc-900/50">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className="w-10 h-10 rounded bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                      <svg
-                        className="w-5 h-5 text-blue-600 dark:text-blue-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50 truncate">
-                        {file.file.name}
-                      </p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
-                        {formatFileSize(file.file.size)}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleRemove}
-                    className="ml-4 p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-                    aria-label="Remove file"
-                  >
-                    <svg
-                      className="w-5 h-5 text-zinc-500 dark:text-zinc-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              {file.file.type === 'application/pdf' && file.preview && (
-                <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-                  <iframe
-                    src={file.preview}
-                    className="w-full h-96"
-                    title="PDF Preview"
-                  />
-                </div>
-              )}
-
-              {file.file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' && (
-                <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-8 text-center bg-zinc-50 dark:bg-zinc-900/50">
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                    DOCX files cannot be previewed in the browser
-                  </p>
-                </div>
-              )}
             </div>
           )}
 
-          {uploadStatus === 'error' && errorMessage && (
-            <div className="mt-4 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg">
-              <p className="text-sm text-red-800 dark:text-red-400">{errorMessage}</p>
-            </div>
-          )}
-
-          {uploadStatus === 'success' && (
-            <div className="mt-4 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 rounded-lg">
-              <p className="text-sm text-green-800 dark:text-green-400">
-                Resume uploaded successfully!
+          {file.file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' && (
+            <div className="border border-foreground/10 rounded-2xl p-12 text-center bg-background/20">
+              <p className="text-sm text-muted-foreground">
+                DOCX files cannot be previewed in the browser
               </p>
             </div>
           )}
-
-          {file && (
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={handleSubmit}
-                disabled={isUploading}
-                className={`
-                  flex-1 px-6 py-3 rounded-lg font-medium text-white
-                  transition-all duration-200
-                  ${isUploading
-                    ? 'bg-zinc-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
-                  }
-                `}
-              >
-                {isUploading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg
-                      className="animate-spin h-5 w-5"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Uploading...
-                  </span>
-                ) : (
-                  'Upload Resume'
-                )}
-              </button>
-            </div>
-          )}
         </div>
-      </div>
+      )}
+
+      {uploadStatus === 'error' && errorMessage && (
+        <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
+        </div>
+      )}
+
+      {uploadStatus === 'success' && (
+        <div className="mt-6 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
+          <p className="text-sm text-green-600 dark:text-green-400">
+            Resume uploaded successfully!
+          </p>
+        </div>
+      )}
+
+      {file && (
+        <div className="mt-6">
+          <button
+            onClick={handleSubmit}
+            disabled={isUploading}
+            className={`
+              w-full px-8 py-4 rounded-2xl font-semibold text-white
+              transition-all duration-300 transform
+              ${isUploading
+                ? 'bg-foreground/40 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl'
+              }
+            `}
+          >
+            {isUploading ? (
+              <span className="flex items-center justify-center gap-3">
+                <svg
+                  className="animate-spin h-5 w-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Uploading...
+              </span>
+            ) : (
+              'Upload Resume'
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
