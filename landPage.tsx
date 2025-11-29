@@ -53,25 +53,26 @@ export const Hero = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    // Clear any existing session on page load - users must sign in explicitly
-    const clearSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await supabase.auth.signOut();
-      }
-      setUser(null);
+    // Check for existing session and user
+    const initializeAuth = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      setUser(currentUser);
     };
-    clearSession();
+    
+    // Only initialize - don't clear sessions automatically
+    // Sessions won't persist across browser restarts due to persistSession: false
+    // But we should allow them during the same session
+    initializeAuth();
 
     // Only listen for auth state changes (when user signs in/out)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
       
-      // If user just signed in and we have pending resume data, save it
-      if (newUser && pendingResumeData && !pendingResumeData.savedToDatabase && uploadedFile) {
+      // If user just signed in (SIGNED_IN event) and we have pending resume data, save it
+      if (event === 'SIGNED_IN' && newUser && pendingResumeData && !pendingResumeData.savedToDatabase && uploadedFile) {
         try {
           // Re-upload the resume to save it now that user is authenticated
           const formData = new FormData();
