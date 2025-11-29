@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { ResetPasswordModal } from "./ResetPasswordModal";
 
 interface SignInModalProps {
   open: boolean;
@@ -20,7 +21,9 @@ interface SignInModalProps {
 
 export const SignInModal = ({ open, onOpenChange }: SignInModalProps) => {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const { toast } = useToast();
 
   const handleGoogleSignIn = async () => {
@@ -61,31 +64,54 @@ export const SignInModal = ({ open, onOpenChange }: SignInModalProps) => {
       return;
     }
 
+    if (!password) {
+      toast({
+        title: "Password required",
+        description: "Please enter your password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
+        password,
       });
 
       if (error) {
         throw error;
       }
 
+      // Success - user is signed in
       toast({
-        title: "Check your email",
-        description: "We sent you a magic link to sign in.",
+        title: "Signed in",
+        description: "Welcome back!",
       });
       onOpenChange(false);
+      
+      // Clear form
+      setEmail("");
+      setPassword("");
     } catch (error) {
       console.error('Email sign in error:', error);
-      toast({
-        title: "Sign in failed",
-        description: error instanceof Error ? error.message : "Failed to send magic link. Please try again.",
-        variant: "destructive",
-      });
+      const errorMessage = error instanceof Error ? error.message : "Failed to sign in. Please try again.";
+      
+      // Check for specific error types
+      if (errorMessage.includes("Invalid login credentials") || errorMessage.includes("Email not confirmed")) {
+        toast({
+          title: "Sign in failed",
+          description: "Invalid email or password. Please check your credentials and try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sign in failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -150,13 +176,34 @@ export const SignInModal = ({ open, onOpenChange }: SignInModalProps) => {
                 className="bg-gray-900 border-white/20 text-white placeholder:text-white/40 focus:border-white/40 h-12"
               />
             </div>
+            <div>
+              <Input
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                className="bg-gray-900 border-white/20 text-white placeholder:text-white/40 focus:border-white/40 h-12"
+              />
+            </div>
             <Button
               type="submit"
               disabled={isLoading}
               className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-6 rounded-lg transition-all"
             >
-              {isLoading ? "Sending..." : "Continue with email"}
+              {isLoading ? "Signing in..." : "Sign in"}
             </Button>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetPasswordModalOpen(true);
+                }}
+                className="text-sm text-white/60 hover:text-white/80 underline"
+              >
+                Forgot password?
+              </button>
+            </div>
           </form>
 
           {/* Legal text */}
@@ -169,6 +216,12 @@ export const SignInModal = ({ open, onOpenChange }: SignInModalProps) => {
           </p>
         </div>
       </DialogContent>
+      
+      {/* Reset Password Modal */}
+      <ResetPasswordModal
+        open={isResetPasswordModalOpen}
+        onOpenChange={setIsResetPasswordModalOpen}
+      />
     </Dialog>
   );
 };

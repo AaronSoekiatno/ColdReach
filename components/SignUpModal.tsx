@@ -22,6 +22,7 @@ interface SignUpModalProps {
 
 export const SignUpModal = ({ open, onOpenChange, fromReview = false, onSwitchToSignIn }: SignUpModalProps) => {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -63,24 +64,74 @@ export const SignUpModal = ({ open, onOpenChange, fromReview = false, onSwitchTo
       return;
     }
 
+    if (!password) {
+      toast({
+        title: "Password required",
+        description: "Please enter a password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
-      const { error } = await supabase.auth.signInWithOtp({
+      // Use signUp with email and password
+      const { error } = await supabase.auth.signUp({
         email,
+        password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
       if (error) {
+        // If the user already exists, prompt them to sign in instead.
+        if (
+          error.code === "user_already_exists" ||
+          /already registered|already exists/i.test(error.message)
+        ) {
+          toast({
+            title: "Account already exists",
+            description:
+              "That email is already on file. Please sign in instead.",
+            variant: "destructive",
+          });
+
+          // If we have a handler to switch to sign-in, call it.
+          if (onSwitchToSignIn) {
+            onOpenChange(false);
+            onSwitchToSignIn();
+          }
+          return;
+        }
         throw error;
       }
 
       toast({
-        title: "Check your email",
-        description: "We sent you a magic link to sign up.",
+        title: "Account created",
+        description: "Your account has been created successfully. You can now sign in.",
       });
       onOpenChange(false);
+      
+      // Clear form
+      setEmail("");
+      setPassword("");
+      
+      // If we have a handler to switch to sign-in, suggest signing in
+      if (onSwitchToSignIn) {
+        setTimeout(() => {
+          onSwitchToSignIn();
+        }, 500);
+      }
     } catch (error) {
       console.error('Email sign up error:', error);
       toast({
@@ -152,12 +203,22 @@ export const SignUpModal = ({ open, onOpenChange, fromReview = false, onSwitchTo
                 className="bg-gray-900 border-white/20 text-white placeholder:text-white/40 focus:border-white/40 h-12"
               />
             </div>
+            <div>
+              <Input
+                type="password"
+                placeholder="Enter your password (min. 6 characters)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                className="bg-gray-900 border-white/20 text-white placeholder:text-white/40 focus:border-white/40 h-12"
+              />
+            </div>
             <Button
               type="submit"
               disabled={isLoading}
               className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-6 rounded-lg transition-all"
             >
-              {isLoading ? "Sending..." : "Continue with email"}
+              {isLoading ? "Creating account..." : "Sign up"}
             </Button>
           </form>
 

@@ -53,44 +53,69 @@ export const Hero = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    // Check for existing session and user
+    // Initialize current user on mount
     const initializeAuth = async () => {
+      // Check if we're coming from an auth callback (magic link or OAuth)
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const isAuthCallback = urlParams.has('code') || urlParams.has('token') || 
+                             hashParams.has('access_token') || hashParams.has('type');
+      
+      // If coming from auth callback, wait a bit for session to be set
+      if (isAuthCallback) {
+        // Wait for session to be available (cookies need time to be set)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      setUser(currentUser);
+      
+      // Use session user if available, otherwise fall back to getUser
+      setUser(session?.user ?? currentUser ?? null);
+      
+      // Clean up URL if we came from auth callback
+      if (isAuthCallback) {
+        // Remove query params and hash
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     };
-    
-    // Only initialize - don't clear sessions automatically
-    // Sessions won't persist across browser restarts due to persistSession: false
-    // But we should allow them during the same session
-    initializeAuth();
+    void initializeAuth();
 
-    // Only listen for auth state changes (when user signs in/out)
+    // Listen for auth state changes (sign in / sign out)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
-      
-      // If user just signed in (SIGNED_IN event) and we have pending resume data, save it
-      if (event === 'SIGNED_IN' && newUser && pendingResumeData && !pendingResumeData.savedToDatabase && uploadedFile) {
+
+      // If user just signed in and we have pending resume data, save it
+      if (
+        event === 'SIGNED_IN' &&
+        newUser &&
+        pendingResumeData &&
+        !pendingResumeData.savedToDatabase &&
+        uploadedFile
+      ) {
         try {
-          // Re-upload the resume to save it now that user is authenticated
           const formData = new FormData();
-          formData.append("resume", uploadedFile);
-          
-          const saveResponse = await fetch("/api/upload-resume", {
-            method: "POST",
+          formData.append('resume', uploadedFile);
+
+          const saveResponse = await fetch('/api/upload-resume', {
+            method: 'POST',
             body: formData,
             credentials: 'include',
           });
-          
+
           if (saveResponse.ok) {
             toast({
-              title: "Resume saved",
-              description: "Your matches have been saved. You can now view them.",
+              title: 'Resume saved',
+              description: 'Your matches have been saved. You can now view them.',
             });
-            // Update pending data to mark as saved
-            setPendingResumeData({ ...pendingResumeData, savedToDatabase: true });
+            setPendingResumeData({
+              ...pendingResumeData,
+              savedToDatabase: true,
+            });
           }
         } catch (error) {
           console.error('Failed to save resume after sign-in:', error);

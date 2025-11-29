@@ -25,13 +25,10 @@ function getSupabaseClient(): SupabaseClient {
     );
   }
 
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
+  // Use default Supabase auth behaviour in the browser:
+  // - Sessions persisted for the duration of the browser session
+  // - OAuth callbacks handled via URL and cookies
+  return createClient(supabaseUrl, supabaseAnonKey);
 }
 
 // Initialize Supabase client
