@@ -31,6 +31,11 @@ export interface CandidateMetadata {
   email: string;
   summary: string;
   skills: string; // Comma-separated string
+  location: string;
+  education_level: string;
+  university: string;
+  past_internships: string; // Comma-separated string
+  technical_projects: string; // Comma-separated string
   createdAt: string;
 }
 
@@ -110,11 +115,19 @@ export async function upsertStartup(
  * Find matching startups for a candidate's embedding
  * @param embedding - Candidate's 768-dimensional vector
  * @param topK - Number of top matches to return (default: 10)
- * @returns Array of matching startups with similarity scores
+ * @param minScore - Minimum similarity score threshold (0-1, default: 0.30)
+ * @returns Array of matching startups with similarity scores above threshold
+ *
+ * Score interpretation:
+ * - 0.70-1.0: Excellent match (70-100%)
+ * - 0.50-0.70: Good match (50-70%)
+ * - 0.30-0.50: Moderate match (30-50%)
+ * - Below 0.30: Filtered out by default
  */
 export async function findMatchingStartups(
   embedding: number[],
-  topK: number = 10
+  topK: number = 10,
+  minScore: number = 0.30
 ): Promise<MatchResult[]> {
   const index = getPineconeClient().index(getIndexName());
 
@@ -126,6 +139,7 @@ export async function findMatchingStartups(
 
   return queryResponse.matches
     .filter((match) => match.metadata) // Filter out matches without metadata
+    .filter((match) => (match.score || 0) >= minScore) // Filter by minimum score
     .map((match) => ({
       id: match.id,
       score: match.score || 0,

@@ -42,8 +42,13 @@ async function extractResumeDataWithGemini(
 {
   "name": "Full name of the candidate",
   "email": "Email address (or empty string if not found)",
-  "skills": ["Array of 6-12 relevant skills or keywords"],
-  "summary": "A 2-3 sentence professional overview of the candidate"
+  "skills": ["Array of 6-12 relevant technical and professional skills"],
+  "summary": "A 2-3 sentence professional overview of the candidate",
+  "location": "Current location or preferred location (city, state/country format, or empty string if not found)",
+  "education_level": "Highest degree (e.g., 'Bachelor's', 'Master's', 'PhD', 'High School', or empty string if not found)",
+  "university": "Name of the university/college for highest degree (or empty string if not found)",
+  "past_internships": ["Array of past internship experiences with company names, or empty array if none found"],
+  "technical_projects": ["Array of notable technical/personal projects with brief descriptions, or empty array if none found"]
 }`;
 
   // Try different model names in order of preference
@@ -131,6 +136,21 @@ async function extractResumeDataWithGemini(
       if (typeof parsed.summary !== 'string') {
         throw new Error('Invalid response: summary must be a string');
       }
+      if (typeof parsed.location !== 'string') {
+        throw new Error('Invalid response: location must be a string');
+      }
+      if (typeof parsed.education_level !== 'string') {
+        throw new Error('Invalid response: education_level must be a string');
+      }
+      if (typeof parsed.university !== 'string') {
+        throw new Error('Invalid response: university must be a string');
+      }
+      if (!Array.isArray(parsed.past_internships)) {
+        throw new Error('Invalid response: past_internships must be an array');
+      }
+      if (!Array.isArray(parsed.technical_projects)) {
+        throw new Error('Invalid response: technical_projects must be an array');
+      }
 
       // Ensure skills count is between 6-12
       if (parsed.skills.length < 6) {
@@ -175,16 +195,24 @@ async function extractResumeDataWithGemini(
 }
 
 /**
- * Generates an embedding for the combined summary and skills using Gemini
+ * Generates an embedding for the candidate profile using Gemini
+ * Combines summary, skills, and additional context for richer matching
  */
 async function generateEmbedding(
-  summary: string,
-  skills: string[]
+  extractionResult: ResumeExtractionResult
 ): Promise<number[]> {
   const { genAI } = getGeminiClients();
   const model = genAI.getGenerativeModel({ model: 'text-embedding-004' });
 
-  const combinedText = `${summary}\nSkills: ${skills.join(', ')}`;
+  // Build a comprehensive text representation for better embedding quality
+  const combinedText = `
+Professional Summary: ${extractionResult.summary}
+Technical Skills: ${extractionResult.skills.join(', ')}
+Location: ${extractionResult.location || 'Not specified'}
+Education: ${extractionResult.education_level || 'Not specified'} from ${extractionResult.university || 'Not specified'}
+Past Internships: ${extractionResult.past_internships.length > 0 ? extractionResult.past_internships.join('; ') : 'None listed'}
+Technical Projects: ${extractionResult.technical_projects.length > 0 ? extractionResult.technical_projects.join('; ') : 'None listed'}
+  `.trim();
 
   const result = await model.embedContent({
     content: {
@@ -348,13 +376,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate embedding for the combined summary and skills
+    // Generate embedding for the candidate profile (includes all extracted fields)
     let embedding: number[];
     try {
-      embedding = await generateEmbedding(
-        extractionResult.summary,
-        extractionResult.skills
-      );
+      embedding = await generateEmbedding(extractionResult);
     } catch (error) {
       console.error('Embedding generation error:', error);
       return NextResponse.json(
@@ -381,6 +406,11 @@ export async function POST(request: NextRequest) {
             email: accountEmail,
             summary: extractionResult.summary,
             skills: extractionResult.skills.join(', '),
+            location: extractionResult.location,
+            education_level: extractionResult.education_level,
+            university: extractionResult.university,
+            past_internships: extractionResult.past_internships.join(', '),
+            technical_projects: extractionResult.technical_projects.join(', '),
           }
         );
         savedToDatabase = true;
@@ -408,6 +438,11 @@ export async function POST(request: NextRequest) {
           name: accountName ?? extractionResult.name,
           summary: extractionResult.summary,
           skills: extractionResult.skills.join(', '),
+          location: extractionResult.location,
+          education_level: extractionResult.education_level,
+          university: extractionResult.university,
+          past_internships: extractionResult.past_internships.join(', '),
+          technical_projects: extractionResult.technical_projects.join(', '),
         });
         console.log('Successfully saved candidate to Supabase:', {
           name: extractionResult.name,
@@ -427,13 +462,49 @@ export async function POST(request: NextRequest) {
       console.log('User not authenticated - skipping database save. Results will be returned for preview.');
     }
 
-    // Find matching startups
+    // Find matching startups with quality threshold
+    // minScore = 0.30 (30%) - filters out very weak matches
     let matches: Array<{ id: string; score: number; metadata: any }> = [];
     let matchingError: string | undefined;
     try {
-      matches = await findMatchingStartups(embedding, 10);
-      console.log(`Found ${matches.length} matching startups for candidate`);
-      
+      const MIN_MATCH_SCORE = 0.30; // Only show matches above 30% similarity
+      matches = await findMatchingStartups(embedding, 10, MIN_MATCH_SCORE);
+
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`FOUND ${matches.length} QUALITY MATCHES (>${(MIN_MATCH_SCORE * 100).toFixed(0)}% similarity)`);
+      console.log('='.repeat(80));
+
+      // Categorize match quality with adjusted thresholds
+      const excellent = matches.filter(m => m.score >= 0.70);
+      const good = matches.filter(m => m.score >= 0.50 && m.score < 0.70);
+      const moderate = matches.filter(m => m.score >= 0.30 && m.score < 0.50);
+
+      console.log(`\nMatch Quality Breakdown:`);
+      console.log(`  🟢 Excellent (70-100%): ${excellent.length}`);
+      console.log(`  🟡 Good (50-70%): ${good.length}`);
+      console.log(`  🟠 Moderate (30-50%): ${moderate.length}`);
+
+      // Log each match with details and quality indicator
+      matches.forEach((match, index) => {
+        const scorePercent = match.score * 100;
+        let quality = '🔴 Weak';
+        if (match.score >= 0.70) quality = '🟢 Excellent';
+        else if (match.score >= 0.50) quality = '🟡 Good';
+        else if (match.score >= 0.30) quality = '🟠 Moderate';
+
+        console.log(`\n--- Match #${index + 1} [${quality}] ---`);
+        console.log(`Startup ID: ${match.id}`);
+        console.log(`Match Score: ${scorePercent.toFixed(2)}%`);
+        console.log(`Name: ${match.metadata?.name || 'N/A'}`);
+        console.log(`Industry: ${match.metadata?.industry || 'N/A'}`);
+        console.log(`Location: ${match.metadata?.location || 'N/A'}`);
+        console.log(`Funding Stage: ${match.metadata?.funding_stage || 'N/A'}`);
+        console.log(`Website: ${match.metadata?.website || 'N/A'}`);
+        console.log(`Full Metadata:`, JSON.stringify(match.metadata, null, 2));
+      });
+
+      console.log(`\n${'='.repeat(80)}\n`);
+
       // Save matches to Supabase - only if authenticated
       if (matches.length > 0 && isAuthenticated && accountEmail) {
         try {
@@ -444,13 +515,15 @@ export async function POST(request: NextRequest) {
               score: match.score,
             }))
           );
-          console.log(`Successfully saved ${matches.length} matches to Supabase`);
+          console.log(`✓ Successfully saved ${matches.length} matches to Supabase for ${accountEmail}`);
         } catch (error) {
-          console.error('Failed to save matches to Supabase:', {
+          console.error('✗ Failed to save matches to Supabase:', {
             error: error instanceof Error ? error.message : 'Unknown error',
           });
           // Continue even if Supabase save fails
         }
+      } else if (!isAuthenticated) {
+        console.log('⚠ User not authenticated - matches will not be saved to database (preview only)');
       }
     } catch (error) {
       matchingError = error instanceof Error ? error.message : 'Unknown matching error';
@@ -469,6 +542,11 @@ export async function POST(request: NextRequest) {
       email: extractionResult.email,
       skills: extractionResult.skills,
       summary: extractionResult.summary,
+      location: extractionResult.location,
+      education_level: extractionResult.education_level,
+      university: extractionResult.university,
+      past_internships: extractionResult.past_internships,
+      technical_projects: extractionResult.technical_projects,
       embedding,
       savedToDatabase,
       matches: matches.map((match) => ({

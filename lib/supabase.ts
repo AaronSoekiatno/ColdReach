@@ -60,6 +60,11 @@ export interface CandidateRow {
   name: string;
   summary: string;
   skills: string; // Comma-separated string
+  location?: string;
+  education_level?: string;
+  university?: string;
+  past_internships?: string; // Comma-separated string
+  technical_projects?: string; // Comma-separated string
   created_at?: string;
 }
 
@@ -69,7 +74,7 @@ export interface CandidateRow {
  */
 export async function saveCandidate(candidate: CandidateRow) {
   const client = supabaseAdmin || supabase;
-  
+
   const { data, error } = await client
     .from('candidates')
     .upsert(
@@ -78,6 +83,11 @@ export async function saveCandidate(candidate: CandidateRow) {
         name: candidate.name,
         summary: candidate.summary,
         skills: candidate.skills,
+        location: candidate.location,
+        education_level: candidate.education_level,
+        university: candidate.university,
+        past_internships: candidate.past_internships,
+        technical_projects: candidate.technical_projects,
         created_at: candidate.created_at || new Date().toISOString(),
       },
       {
