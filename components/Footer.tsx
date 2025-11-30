@@ -9,7 +9,7 @@ export const Footer = () => {
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           {/* Copyright */}
           <div className="text-white/80 text-sm">
-            © 2025 ColdStart. All rights reserved.
+            © 2025 ColdReach. All rights reserved.
           </div>
           
           {/* Navigation Links */}

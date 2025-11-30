@@ -49,6 +49,18 @@ export default async function MatchesPage() {
     throw new Error('Supabase service role key is not configured.');
   }
 
+  // First, get the candidate's UUID by email
+  const { data: candidate } = await supabaseAdmin
+    .from('candidates')
+    .select('id')
+    .eq('email', user.email ?? '')
+    .single();
+
+  if (!candidate) {
+    // No candidate record found, redirect to upload page
+    redirect('/?error=no_resume');
+  }
+
   const { data: matches, error } = await supabaseAdmin
     .from('matches')
     .select(
@@ -68,7 +80,7 @@ export default async function MatchesPage() {
         )
       `
     )
-    .eq('candidate_email', user.email ?? '')
+    .eq('candidate_id', candidate.id)
     .order('score', { ascending: false });
 
   if (error) {
@@ -78,12 +90,12 @@ export default async function MatchesPage() {
   const typedMatches = ((matches ?? []) as unknown) as MatchRecord[];
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-white dark:from-zinc-900 dark:via-zinc-950 dark:to-black py-20">
+    <section className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 dark:from-zinc-900 dark:via-zinc-950 dark:to-black py-20">
       <div className="container mx-auto px-4 space-y-10">
         <div className="text-center space-y-3">
-          <p className="text-sm uppercase tracking-[0.3em] text-blue-500">Your Matches</p>
-          <h1 className="text-4xl font-bold text-foreground">Startups excited to meet you</h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm uppercase tracking-[0.3em] text-blue-300 font-semibold">Your Matches</p>
+          <h1 className="text-4xl font-bold text-white">Startups excited to meet you</h1>
+          <p className="text-blue-100">
             {typedMatches.length > 0
               ? `Showing ${typedMatches.length} matched startup${
                   typedMatches.length === 1 ? '' : 's'
@@ -97,33 +109,33 @@ export default async function MatchesPage() {
             {typedMatches.map((match) => (
               <article
                 key={match.id}
-                className="rounded-3xl border border-border/40 bg-background/80 backdrop-blur-xl p-6 shadow-lg"
+                className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl p-6 shadow-2xl hover:bg-white/15 transition-all duration-300"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-semibold text-foreground">
+                    <h2 className="text-2xl font-semibold text-white">
                       {match.startup?.name ?? 'Unknown Startup'}
                     </h2>
-                    <p className="text-sm text-muted-foreground">{match.startup?.industry}</p>
+                    <p className="text-sm text-blue-200 mt-1">{match.startup?.industry}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Match score</p>
-                    <p className="text-2xl font-bold text-blue-600">
+                    <p className="text-sm text-blue-200">Match score</p>
+                    <p className="text-2xl font-bold text-blue-300">
                       {(match.score * 100).toFixed(0)}%
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                  {match.startup?.location && <p>Location: {match.startup.location}</p>}
+                <div className="mt-4 space-y-2 text-sm text-blue-100">
+                  {match.startup?.location && <p className="text-white/90">📍 Location: <span className="text-blue-200">{match.startup.location}</span></p>}
                   {match.startup?.funding_stage && (
-                    <p>
-                      Funding: {match.startup.funding_stage}{' '}
-                      {match.startup.funding_amount && `• ${match.startup.funding_amount}`}
+                    <p className="text-white/90">
+                      💰 Funding: <span className="text-blue-200">{match.startup.funding_stage}</span>
+                      {match.startup.funding_amount && <span className="text-blue-200"> • {match.startup.funding_amount}</span>}
                     </p>
                   )}
                   {match.startup?.tags && (
-                    <p className="text-xs uppercase tracking-widest text-foreground/60">
+                    <p className="text-xs uppercase tracking-widest text-blue-300 font-semibold mt-3">
                       {match.startup.tags}
                     </p>
                   )}
@@ -137,7 +149,7 @@ export default async function MatchesPage() {
                         : `https://${match.startup.website}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-2xl border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-foreground/5"
+                      className="rounded-2xl border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 hover:border-white/40"
                     >
                       Visit website
                     </a>
@@ -145,7 +157,7 @@ export default async function MatchesPage() {
                   {match.startup?.founder_emails && (
                     <a
                       href={`mailto:${match.startup.founder_emails}`}
-                      className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                      className="rounded-2xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-400 shadow-lg hover:shadow-xl"
                     >
                       Email founder
                     </a>
@@ -155,8 +167,8 @@ export default async function MatchesPage() {
             ))}
           </div>
         ) : (
-          <div className="rounded-3xl border border-border/40 bg-background/80 backdrop-blur-xl p-12 text-center text-muted-foreground">
-            No matches yet. Upload your resume to get started.
+          <div className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl p-12 text-center text-white">
+            <p className="text-lg">No matches yet. Upload your resume to get started.</p>
           </div>
         )}
       </div>

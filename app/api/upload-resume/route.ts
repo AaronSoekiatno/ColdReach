@@ -10,7 +10,7 @@ import {
   type ResumeProcessingResult,
 } from './utils';
 import { upsertCandidate, findMatchingStartups } from '@/lib/pinecone';
-import { saveCandidate, saveMatches } from '@/lib/supabase';
+import { saveCandidate, saveMatches, saveStartup } from '@/lib/supabase';
 import { createServerClient } from '@supabase/ssr';
 
 export const runtime = 'nodejs';
@@ -230,16 +230,26 @@ Technical Projects: ${extractionResult.technical_projects.length > 0 ? extractio
 
 export async function POST(request: NextRequest) {
   try {
+    // Import cookies at runtime (Next.js 15+ requirement)
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return request.cookies.getAll();
+            return cookieStore.getAll();
           },
-          setAll() {
-            // No-op for route handler (we only need read access)
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => {
+                cookieStore.set(name, value, options);
+              });
+            } catch {
+              // Cookie setting might fail in route handlers - this is okay
+            }
           },
         },
       }
@@ -251,11 +261,25 @@ export async function POST(request: NextRequest) {
       error: authError,
     } = await supabase.auth.getUser();
 
+    // Debug authentication
+    console.log('\n=== AUTHENTICATION DEBUG ===');
+    console.log('Auth Error:', authError);
+    console.log('User Object:', user ? {
+      id: user.id,
+      email: user.email,
+      user_metadata: user.user_metadata,
+    } : 'No user');
+    console.log('Cookies:', request.cookies.getAll());
+    console.log('============================\n');
+
     const isAuthenticated = !authError && user && user.email;
     const accountEmail = isAuthenticated ? user.email : null;
     const accountName = isAuthenticated
       ? ((user.user_metadata?.full_name as string | undefined) ?? undefined)
       : undefined;
+
+    console.log('Is Authenticated:', isAuthenticated);
+    console.log('Account Email:', accountEmail);
 
     // Check for API key
     const apiKey = process.env.GEMINI_API_KEY;
@@ -396,6 +420,8 @@ export async function POST(request: NextRequest) {
     // Save candidate to Pinecone (for vector search) - only if authenticated
     let savedToDatabase = false;
     let databaseError: string | undefined;
+    let candidateId: string | null = null; // Declare at this scope level
+
     if (isAuthenticated && accountEmail) {
       try {
         await upsertCandidate(
@@ -431,9 +457,9 @@ export async function POST(request: NextRequest) {
         // Continue even if DB save fails - we still want to return the extracted data
       }
 
-      // Save candidate to Supabase (for detailed queries)
+      // Save candidate to Supabase (for detailed queries) and get the UUID
       try {
-        await saveCandidate({
+        const savedCandidate = await saveCandidate({
           email: accountEmail,
           name: accountName ?? extractionResult.name,
           summary: extractionResult.summary,
@@ -444,9 +470,11 @@ export async function POST(request: NextRequest) {
           past_internships: extractionResult.past_internships.join(', '),
           technical_projects: extractionResult.technical_projects.join(', '),
         });
+        candidateId = savedCandidate.id; // Get the UUID
         console.log('Successfully saved candidate to Supabase:', {
           name: extractionResult.name,
           email: accountEmail,
+          id: candidateId,
         });
       } catch (error) {
         console.error('Failed to save candidate to Supabase:', {
@@ -463,11 +491,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Find matching startups with quality threshold
-    // minScore = 0.30 (30%) - filters out very weak matches
+    // minScore = 0.45 (45%) - filters out very weak matches
     let matches: Array<{ id: string; score: number; metadata: any }> = [];
     let matchingError: string | undefined;
     try {
-      const MIN_MATCH_SCORE = 0.30; // Only show matches above 30% similarity
+      const MIN_MATCH_SCORE = 0.45; // Only show matches above 45% similarity
       matches = await findMatchingStartups(embedding, 10, MIN_MATCH_SCORE);
 
       console.log(`\n${'='.repeat(80)}`);
@@ -505,25 +533,51 @@ export async function POST(request: NextRequest) {
 
       console.log(`\n${'='.repeat(80)}\n`);
 
-      // Save matches to Supabase - only if authenticated
-      if (matches.length > 0 && isAuthenticated && accountEmail) {
+      // Save matches to Supabase - only if authenticated and we have a candidate ID
+      if (matches.length > 0 && isAuthenticated && candidateId) {
         try {
+          // First, ensure all matched startups exist in Supabase
+          // This prevents foreign key constraint violations
+          console.log(`Syncing ${matches.length} matched startups to Supabase...`);
+          for (const match of matches) {
+            try {
+              await saveStartup({
+                id: match.id,
+                name: match.metadata.name || 'Unknown',
+                industry: match.metadata.industry || '',
+                description: match.metadata.description || '',
+                funding_stage: match.metadata.funding_stage || '',
+                funding_amount: match.metadata.funding_amount || '',
+                location: match.metadata.location || '',
+                website: match.metadata.website || '',
+                tags: match.metadata.tags || '',
+              });
+            } catch (error) {
+              console.warn(`Failed to sync startup ${match.id} to Supabase:`, error instanceof Error ? error.message : 'Unknown error');
+              // Continue with other startups even if one fails
+            }
+          }
+
+          // Now save the matches (foreign keys should be valid now)
           await saveMatches(
-            accountEmail,
+            candidateId, // Use UUID instead of email
             matches.map((match) => ({
               startup_id: match.id,
               score: match.score,
             }))
           );
-          console.log(`✓ Successfully saved ${matches.length} matches to Supabase for ${accountEmail}`);
+          console.log(`✓ Successfully saved ${matches.length} matches to Supabase for candidate ${candidateId}`);
         } catch (error) {
           console.error('✗ Failed to save matches to Supabase:', {
             error: error instanceof Error ? error.message : 'Unknown error',
+            candidateId,
           });
           // Continue even if Supabase save fails
         }
       } else if (!isAuthenticated) {
         console.log('⚠ User not authenticated - matches will not be saved to database (preview only)');
+      } else if (!candidateId) {
+        console.log('⚠ Candidate ID not available - matches will not be saved to database');
       }
     } catch (error) {
       matchingError = error instanceof Error ? error.message : 'Unknown matching error';

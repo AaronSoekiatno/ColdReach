@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 
 const SAMPLE_MATCHED_STARTUPS = [
   "Anthropic",
@@ -237,58 +238,77 @@ export const Hero = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800">
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-
-        {/* Sign In Button / Account Indicator */}
-        <div className="absolute top-8 right-8 z-20">
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-2xl border border-white/30 bg-white/10 px-4 py-2 text-white transition hover:border-white/50 focus:outline-none focus:ring-2 focus:ring-white/40">
-                  <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center font-semibold">
-                    {user.email?.[0]?.toUpperCase() ?? "U"}
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold">{user.email}</p>
-                    <p className="text-xs text-white/60">Signed in</p>
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="border-white/30 bg-white/10 text-white px-0 py-0 rounded-2xl overflow-hidden min-w-[250px]">
-                <DropdownMenuItem
-                  className="cursor-pointer text-white w-full px-4 py-2 text-center hover:bg-white/20 focus:bg-white/20"
-                  onSelect={async () => {
-                    await supabase.auth.signOut();
-                    setUser(null);
-                    toast({
-                      title: "Signed out",
-                      description: "You have been signed out successfully.",
-                    });
-                  }}
-                >
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsSignInModalOpen(true)}
-                className="backdrop-blur-3xl bg-background/40 hover:bg-background/60 transition-all hover:-translate-y-1 duration-300 border-white/30 rounded-2xl text-white hover:text-white"
-              >
-                Sign In
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsSignUpModalOpen(true)}
-                className="backdrop-blur-3xl bg-background/40 hover:bg-background/60 transition-all hover:-translate-y-1 duration-300 border-white/30 rounded-2xl text-white hover:text-white"
-              >
-                Sign Up
-              </Button>
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/10 border-b border-white/20">
+        <div className="container mx-auto px-8 py-3 flex items-center justify-between">
+          {/* Logo and Title */}
+          <Link href="/" className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center">
+              <span className="text-white font-bold text-lg">C</span>
             </div>
-          )}
+            <span className="text-white font-semibold text-2xl">ColdReach</span>
+          </Link>
+
+          {/* Sign In Button / Account Indicator */}
+          <div className="flex items-center gap-1">
+            {user ? (
+              <>
+                <Link
+                  href="/matches"
+                  className="text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                >
+                  Your Matches
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none">
+                      <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center font-semibold text-xs">
+                        {user.email?.[0]?.toUpperCase() ?? "U"}
+                      </div>
+                      
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="border-white/30 bg-white/10 text-white px-0 py-0 rounded-2xl overflow-hidden min-w-[200px]">
+                    <div className="px-4 py-2 text-sm text-white/80 border-b border-white/10">
+                      {user.email}
+                    </div>
+                    <DropdownMenuItem
+                      className="cursor-pointer text-white w-full px-4 py-2 text-center hover:bg-white/20 focus:bg-white/20"
+                      onSelect={async () => {
+                        await supabase.auth.signOut();
+                        setUser(null);
+                        toast({
+                          title: "Signed out",
+                          description: "You have been signed out successfully.",
+                        });
+                      }}
+                    >
+                      Sign out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setIsSignInModalOpen(true)}
+                  className="text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => setIsSignUpModalOpen(true)}
+                  className="text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                >
+                  Sign Up
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+      </header>
+
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
 
         {/* Sign In Modal */}
         <SignInModal 
@@ -452,10 +472,11 @@ export const Hero = () => {
                       description: "Failed to save your resume. Please try uploading again.",
                       variant: "destructive",
                     });
+                    return; // Don't navigate if save failed
                   }
                 }
-                // TODO: Navigate to results page or show results component
-                // For now, just close the modal
+                // Navigate to the matches page
+                window.location.href = '/matches';
               }
             }}
           >

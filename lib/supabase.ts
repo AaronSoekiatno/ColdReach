@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
 // Supabase configuration
 // These environment variables should be set in .env.local
@@ -7,7 +8,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /**
- * Get the Supabase client instance
+ * Get the Supabase client instance for browser use
+ * Uses createBrowserClient to properly handle cookies for SSR
  * Validates environment variables and throws helpful errors if missing
  */
 function getSupabaseClient(): SupabaseClient {
@@ -25,15 +27,13 @@ function getSupabaseClient(): SupabaseClient {
     );
   }
 
-  // Use default Supabase auth behaviour in the browser:
-  // - Sessions persisted for the duration of the browser session
-  // - OAuth callbacks handled via URL and cookies
-  return createClient(supabaseUrl, supabaseAnonKey);
+  // Use createBrowserClient for proper cookie-based session management
+  // This ensures sessions are shared between client and server in Next.js
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
 
-// Initialize Supabase client
-// This client can be used in both server and client components
-// The client is created lazily to avoid errors during build time
+// Initialize Supabase client for browser/client components
+// This client properly handles cookies so sessions work across client/server
 export const supabase = getSupabaseClient();
 
 // For server-side operations that require elevated permissions,
@@ -53,7 +53,8 @@ export const supabaseAdmin = supabaseServiceRoleKey
 // ==================== CANDIDATE FUNCTIONS ====================
 
 export interface CandidateRow {
-  email: string; // Primary key
+  id?: string; // UUID primary key (auto-generated)
+  email: string; // Unique email
   name: string;
   summary: string;
   skills: string; // Comma-separated string
@@ -68,8 +69,9 @@ export interface CandidateRow {
 /**
  * Save or update a candidate in Supabase
  * @param candidate - Candidate data
+ * @returns The saved candidate record with UUID id
  */
-export async function saveCandidate(candidate: CandidateRow) {
+export async function saveCandidate(candidate: CandidateRow): Promise<{ id: string; email: string; [key: string]: any }> {
   const client = supabaseAdmin || supabase;
 
   const { data, error } = await client
@@ -259,7 +261,7 @@ export async function getStartupByName(name: string) {
 // ==================== MATCH FUNCTIONS ====================
 
 export interface MatchRow {
-  candidate_email: string; // Foreign key to candidates.email
+  candidate_id: string; // Foreign key to candidates (email or id)
   startup_id: string; // Foreign key to startups.id
   score: number; // Similarity score (0-1)
   matched_at?: string;
@@ -271,11 +273,11 @@ export interface MatchRow {
  */
 export async function saveMatch(match: MatchRow) {
   const client = supabaseAdmin || supabase;
-  
+
   const { data, error } = await client
     .from('matches')
     .insert({
-      candidate_email: match.candidate_email,
+      candidate_id: match.candidate_id,
       startup_id: match.startup_id,
       score: match.score,
       matched_at: match.matched_at || new Date().toISOString(),
@@ -292,17 +294,17 @@ export async function saveMatch(match: MatchRow) {
 
 /**
  * Save multiple matches for a candidate
- * @param candidateEmail - Candidate's email
+ * @param candidateId - Candidate's identifier (email)
  * @param matches - Array of matches with startup_id and score
  */
 export async function saveMatches(
-  candidateEmail: string,
+  candidateId: string,
   matches: Array<{ startup_id: string; score: number }>
 ) {
   const client = supabaseAdmin || supabase;
-  
+
   const matchRows = matches.map((match) => ({
-    candidate_email: candidateEmail,
+    candidate_id: candidateId,
     startup_id: match.startup_id,
     score: match.score,
     matched_at: new Date().toISOString(),
@@ -310,7 +312,9 @@ export async function saveMatches(
 
   const { data, error } = await client
     .from('matches')
-    .insert(matchRows)
+    .upsert(matchRows, {
+      onConflict: 'candidate_id,startup_id'
+    })
     .select();
 
   if (error) {
@@ -323,16 +327,16 @@ export async function saveMatches(
 /**
  * Get all matches for a candidate
  */
-export async function getCandidateMatches(candidateEmail: string) {
+export async function getCandidateMatches(candidateId: string) {
   const client = supabaseAdmin || supabase;
-  
+
   const { data, error } = await client
     .from('matches')
     .select(`
       *,
       startup:startups(*)
     `)
-    .eq('candidate_email', candidateEmail)
+    .eq('candidate_id', candidateId)
     .order('score', { ascending: false });
 
   if (error) {
