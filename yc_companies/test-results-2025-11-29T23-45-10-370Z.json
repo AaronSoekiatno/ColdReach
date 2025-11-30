@@ -1,0 +1,50 @@
+[
+  {
+    "companyName": "Revolut",
+    "website": "www.revolut.com",
+    "foundersFound": 0,
+    "emailsFound": 0,
+    "primaryFounder": "",
+    "primaryEmail": "",
+    "emailSources": [],
+    "tier1Success": false,
+    "tier2Success": false,
+    "success": false
+  },
+  {
+    "companyName": "Sierra",
+    "website": "sierra.ai",
+    "foundersFound": 0,
+    "emailsFound": 0,
+    "primaryFounder": "",
+    "primaryEmail": "",
+    "emailSources": [],
+    "tier1Success": false,
+    "tier2Success": false,
+    "success": false
+  },
+  {
+    "companyName": "Find Your Grind",
+    "website": "findyourgrind.com",
+    "foundersFound": 7,
+    "emailsFound": 0,
+    "primaryFounder": "is the",
+    "primaryEmail": "",
+    "emailSources": [],
+    "tier1Success": false,
+    "tier2Success": false,
+    "success": false
+  },
+  {
+    "companyName": "Onton",
+    "website": "onton.com",
+    "foundersFound": 0,
+    "emailsFound": 0,
+    "primaryFounder": "",
+    "primaryEmail": "",
+    "emailSources": [],
+    "tier1Success": false,
+    "tier2Success": false,
+    "success": false
+  }
+]

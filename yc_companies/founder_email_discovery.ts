@@ -2,14 +2,16 @@
  * Enhanced Founder Email Discovery Agent
  *
  * Multi-tier approach to finding founder emails:
- * 1. Free public sources (company website, LinkedIn, GitHub, etc.)
- * 2. Specialized aggregators (AngelList, Product Hunt, etc.)
- * 3. Paid API fallback (Hunter.io)
+ * 1. Get founder names from existing data or web search
+ * 2. Generate email patterns (first@domain, first.last@domain, etc.)
+ * 3. Verify patterns using Rapid Email Verifier (free, 1000/month)
+ * 4. Mark remaining for manual Hunter.io lookup
  *
  * This ensures we maximize accuracy while minimizing API costs.
  */
 
 import { searchWeb, SearchResult } from './web_search_agent';
+import { findFounderEmailByPattern } from './email_pattern_matcher';
 
 export interface FounderInfo {
   name: string;
@@ -17,7 +19,7 @@ export interface FounderInfo {
   linkedin?: string;
   role?: string;
   background?: string;
-  emailSource?: 'website' | 'linkedin' | 'github' | 'angellist' | 'producthunt' | 'hunter.io' | 'other';
+  emailSource?: 'website' | 'linkedin' | 'github' | 'angellist' | 'producthunt' | 'pattern_matched' | 'hunter.io' | 'other';
   confidence?: number; // 0.0 - 1.0
 }
 
@@ -26,6 +28,34 @@ export interface FounderEmailDiscoveryResult {
   totalFound: number;
   emailsFound: number;
   primaryFounder?: FounderInfo;
+}
+
+/**
+ * Validate if a name is legitimate (not garbage from regex extraction)
+ */
+function isValidName(name: string): boolean {
+  if (!name || name.length < 3) return false;
+
+  // Remove common garbage patterns
+  const invalidPatterns = [
+    /^(from|to|is|the|and|or|of|in|on|at|by|for|with|as|our|their|his|her)\s/i,
+    /\s(from|to|is|the|and|or|of|in|on|at|by|for|with|as|our|their|his|her)$/i,
+    /^(co-?founder|founder|ceo|cto|cfo)\s*$/i, // Just a title, no name
+    /^(technical|research|industry|innovators?)\s/i,
+  ];
+
+  for (const pattern of invalidPatterns) {
+    if (pattern.test(name)) return false;
+  }
+
+  // Must have at least 2 parts (first + last name)
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return false;
+
+  // Each part should be at least 2 characters
+  if (parts.some(part => part.length < 2)) return false;
+
+  return true;
 }
 
 /**
@@ -304,17 +334,34 @@ export async function discoverFounderEmails(
     console.log(`    Total founders after Tier 2: ${allFounders.length}`);
   }
 
-  // Tier 3: Hunter.io (only if still no emails and enabled)
-  const foundersWithEmails = allFounders.filter(f => f.email);
-  if (useHunterIO && foundersWithEmails.length === 0 && websiteDomain) {
-    console.log('  💰 Tier 3: Using Hunter.io API...');
-    const hunterFounders = await searchHunterIO(companyName, websiteDomain);
-    allFounders.push(...hunterFounders);
-    console.log(`    Found ${hunterFounders.length} founders from Hunter.io`);
+  // Deduplicate and merge founder data FIRST
+  let mergedFounders = mergeFounderData(allFounders);
+
+  // Tier 3: Pattern Matching (for founders without emails)
+  const foundersWithoutEmails = mergedFounders.filter(f => !f.email && isValidName(f.name));
+  if (foundersWithoutEmails.length > 0 && websiteDomain) {
+    console.log(`  🔍 Tier 3: Pattern matching for ${foundersWithoutEmails.length} founders without emails...`);
+
+    for (const founder of foundersWithoutEmails) {
+      const result = await findFounderEmailByPattern(founder.name, websiteDomain);
+
+      if (result && result.isDeliverable) {
+        founder.email = result.email;
+        founder.emailSource = 'pattern_matched';
+        founder.confidence = result.confidence * 0.75; // Pattern matched = medium confidence
+      }
+    }
   }
 
-  // Deduplicate and merge founder data
-  const mergedFounders = mergeFounderData(allFounders);
+  // Tier 4: Hunter.io (only if still no emails and enabled)
+  const foundersWithEmails = mergedFounders.filter(f => f.email);
+  if (useHunterIO && foundersWithEmails.length === 0 && websiteDomain) {
+    console.log('  💰 Tier 4: Using Hunter.io API...');
+    const hunterFounders = await searchHunterIO(companyName, websiteDomain);
+    allFounders.push(...hunterFounders);
+    mergedFounders = mergeFounderData([...mergedFounders, ...hunterFounders]);
+    console.log(`    Found ${hunterFounders.length} founders from Hunter.io`);
+  }
 
   // Find primary founder (usually CEO or first founder)
   const primaryFounder = mergedFounders.find(f =>

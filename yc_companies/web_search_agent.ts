@@ -570,8 +570,8 @@ Rules:
       founderEmails = '';
     } else if (founderEmails) {
       // Filter out generic email patterns that might be hallucinations
-      const emailList = founderEmails.split(',').map(e => e.trim()).filter(e => e);
-      const filteredEmails = emailList.filter(email => {
+      const emailList = founderEmails.split(',').map((e: string) => e.trim()).filter((e: string) => e);
+      const filteredEmails = emailList.filter((email: string) => {
         const emailLower = email.toLowerCase();
         // Exclude generic patterns
         if (emailLower.match(/^(hello|info|contact|support|admin|noreply|no-reply|team|founders?)@/)) {
@@ -724,8 +724,8 @@ Rules:
       founderEmails = '';
     } else if (founderEmails) {
       // Filter out generic email patterns that might be hallucinations
-      const emailList = founderEmails.split(',').map(e => e.trim()).filter(e => e);
-      const filteredEmails = emailList.filter(email => {
+      const emailList = founderEmails.split(',').map((e: string) => e.trim()).filter((e: string) => e);
+      const filteredEmails = emailList.filter((email: string) => {
         const emailLower = email.toLowerCase();
         // Exclude generic patterns
         if (emailLower.match(/^(hello|info|contact|support|admin|noreply|no-reply|team|founders?)@/)) {

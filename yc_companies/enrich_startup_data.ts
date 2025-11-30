@@ -24,6 +24,11 @@ import {
   extractAllEnrichmentData,
   isGeminiQuotaExceeded
 } from './web_search_agent';
+import {
+  calculateEnrichmentQuality,
+  getEnrichmentStatus,
+  getQualitySummary,
+} from './enrichment_quality';
 
 // Initialize Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -221,80 +226,98 @@ async function searchWebForStartup(startup: StartupRecord): Promise<EnrichedData
  *    - Job openings
  */
 /**
- * Check if a field is null or undefined (not just empty string)
+ * Check if a field is null, undefined, or empty string
  */
-function isNullOrUndefined(value: any): boolean {
-  return value === null || value === undefined;
+function isEmptyOrNull(value: any): boolean {
+  return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+}
+
+/**
+ * Check if a value looks like a placeholder/default value
+ */
+function isPlaceholderValue(value: any, field: string): boolean {
+  if (!value || typeof value !== 'string') return false;
+  const lower = value.toLowerCase().trim();
+  
+  // Common placeholder patterns
+  if (field === 'founder_emails' && (lower.startsWith('hello@') || lower.includes('example.com') || lower.includes('test.com'))) {
+    return true;
+  }
+  if (field === 'founder_names' && (lower === 'team' || lower === 'founder' || lower === 'n/a')) {
+    return true;
+  }
+  if (field === 'website' && (!lower.includes('.') || lower === 'website.com' || lower === 'example.com')) {
+    return true;
+  }
+  return false;
 }
 
 function mergeEnrichedData(existing: StartupRecord, enriched: EnrichedData): Partial<StartupRecord> {
   const updates: Partial<StartupRecord> = {};
 
-  // Only update fields that are null or undefined (not empty strings or existing values)
-  if (enriched.founder_names && isNullOrUndefined(existing.founder_names)) {
+  // Update fields if they're empty/null OR if they look like placeholders
+  // This allows overwriting placeholder data with real extracted data
+  if (enriched.founder_names && (isEmptyOrNull(existing.founder_names) || isPlaceholderValue(existing.founder_names, 'founder_names'))) {
     updates.founder_names = enriched.founder_names;
   }
 
-  if (enriched.founder_emails && isNullOrUndefined(existing.founder_emails)) {
+  if (enriched.founder_emails && (isEmptyOrNull(existing.founder_emails) || isPlaceholderValue(existing.founder_emails, 'founder_emails'))) {
     updates.founder_emails = enriched.founder_emails;
   }
 
-  if (enriched.founder_linkedin && isNullOrUndefined(existing.founder_linkedin)) {
+  if (enriched.founder_linkedin && (isEmptyOrNull(existing.founder_linkedin) || isPlaceholderValue(existing.founder_linkedin, 'founder_linkedin'))) {
     updates.founder_linkedin = enriched.founder_linkedin;
   }
 
-  if (enriched.website && isNullOrUndefined(existing.website)) {
-    // Only update if null (TechCrunch scraper doesn't extract this, so it should be null)
+  if (enriched.website && (isEmptyOrNull(existing.website) || isPlaceholderValue(existing.website, 'website'))) {
     updates.website = enriched.website;
   }
 
-  if (enriched.job_openings && isNullOrUndefined(existing.job_openings)) {
+  if (enriched.job_openings && isEmptyOrNull(existing.job_openings)) {
     updates.job_openings = enriched.job_openings;
   }
 
-  // Description: Only update if null (TechCrunch should have provided description)
-  if (enriched.description && isNullOrUndefined(existing.description)) {
+  // Description: Only update if null/empty (TechCrunch should have provided description)
+  if (enriched.description && isEmptyOrNull(existing.description)) {
     updates.description = enriched.description;
   }
 
-  // Funding amount: Only update if null (TechCrunch should have this)
-  if (enriched.funding_amount && isNullOrUndefined(existing.funding_amount)) {
+  // Funding amount: Only update if null/empty (TechCrunch should have this)
+  if (enriched.funding_amount && isEmptyOrNull(existing.funding_amount)) {
     updates.funding_amount = enriched.funding_amount;
   }
 
-  if (enriched.location && isNullOrUndefined(existing.location)) {
-    // Only update if null (TechCrunch scraper doesn't extract this, so it should be null)
+  if (enriched.location && isEmptyOrNull(existing.location)) {
     updates.location = enriched.location;
   }
 
-  if (enriched.industry && isNullOrUndefined(existing.industry)) {
-    // Only update if null (TechCrunch scraper doesn't extract this, so it should be null)
+  if (enriched.industry && isEmptyOrNull(existing.industry)) {
     updates.industry = enriched.industry;
   }
 
-  // Add new comprehensive fields - only update if null
-  if (enriched.tech_stack && isNullOrUndefined(existing.tech_stack)) {
+  // Add new comprehensive fields - update if null/empty
+  if (enriched.tech_stack && isEmptyOrNull(existing.tech_stack)) {
     updates.tech_stack = enriched.tech_stack;
   }
 
-  if (enriched.target_customer && isNullOrUndefined(existing.target_customer)) {
+  if (enriched.target_customer && isEmptyOrNull(existing.target_customer)) {
     updates.target_customer = enriched.target_customer;
   }
 
-  if (enriched.market_vertical && isNullOrUndefined(existing.market_vertical)) {
+  if (enriched.market_vertical && isEmptyOrNull(existing.market_vertical)) {
     updates.market_vertical = enriched.market_vertical;
   }
 
-  if (enriched.team_size && isNullOrUndefined(existing.team_size)) {
+  if (enriched.team_size && isEmptyOrNull(existing.team_size)) {
     updates.team_size = enriched.team_size;
   }
 
-  if (enriched.founder_backgrounds && isNullOrUndefined(existing.founder_backgrounds)) {
+  if (enriched.founder_backgrounds && isEmptyOrNull(existing.founder_backgrounds)) {
     updates.founder_backgrounds = enriched.founder_backgrounds;
   }
 
-  // Generate keywords from industry and target_customer if available - only if keywords is null
-  if ((enriched.industry || enriched.target_customer) && isNullOrUndefined(existing.keywords)) {
+  // Generate keywords from industry and target_customer if available - only if keywords is null/empty
+  if ((enriched.industry || enriched.target_customer) && isEmptyOrNull(existing.keywords)) {
     const keywordParts = [enriched.industry, enriched.target_customer].filter(Boolean);
     if (keywordParts.length > 0) {
       updates.keywords = keywordParts.join(', ');
@@ -323,6 +346,28 @@ async function enrichStartup(startup: StartupRecord): Promise<boolean> {
     // Merge enriched data
     const updates = mergeEnrichedData(startup, enrichedData);
     
+    // Create confidence scores for extracted data
+    // Simple enricher doesn't have detailed confidence, so we estimate based on source
+    const confidence: Record<string, number> = {};
+    for (const [field, value] of Object.entries(updates)) {
+      if (value) {
+        // LLM-extracted data gets higher confidence (0.8)
+        // Regex-extracted data gets lower confidence (0.6)
+        // Since we use extractAllEnrichmentData which uses LLM, default to 0.75
+        confidence[field] = 0.75;
+      }
+    }
+    
+    // Calculate enrichment quality
+    const mergedData = { ...startup, ...updates };
+    const quality = calculateEnrichmentQuality(mergedData, updates, confidence);
+    const enrichmentStatus = getEnrichmentStatus(quality);
+    
+    console.log(`  📊 Quality Assessment: ${getQualitySummary(quality)}`);
+    if (quality.issues.length > 0) {
+      console.log(`  ⚠️  Issues: ${quality.issues.join('; ')}`);
+    }
+    
     if (Object.keys(updates).length > 0) {
       // Filter out fields that might not exist in database (new columns from migration)
       // Only include fields that are known to exist in the startups table
@@ -342,21 +387,26 @@ async function enrichStartup(startup: StartupRecord): Promise<boolean> {
         }
       }
       
+      // Add quality metrics
+      const finalUpdates: any = {
+        ...safeUpdates,
+        enrichment_quality_score: quality.overallScore,
+        enrichment_quality_status: quality.status,
+        enrichment_status: enrichmentStatus,
+        needs_enrichment: enrichmentStatus !== 'completed',
+      };
+      
       // Update startup in Supabase
       // Note: updated_at is automatically handled by database trigger
       const { error } = await supabase
         .from('startups')
-        .update({
-          ...safeUpdates,
-          needs_enrichment: false,
-          enrichment_status: 'completed',
-        })
+        .update(finalUpdates)
         .eq('id', startup.id);
       
       if (error) {
         // If error is about missing column, try again without new columns
-        if (error.message?.includes('Could not find') || error.code === 'PGRST204') {
-          console.warn(`  ⚠️  Some columns may not exist in database. Retrying without new columns...`);
+        if (error.message?.includes('Could not find') || error.code === 'PGRST204' || error.message?.includes('enrichment_quality')) {
+          console.warn(`  ⚠️  Some columns may not exist in database. Retrying without new/quality columns...`);
           const basicColumns = [
             'founder_names', 'founder_emails', 'founder_linkedin',
             'website', 'job_openings', 'description', 'funding_amount',
@@ -373,8 +423,8 @@ async function enrichStartup(startup: StartupRecord): Promise<boolean> {
             .from('startups')
             .update({
               ...basicUpdates,
-              needs_enrichment: false,
-              enrichment_status: 'completed',
+              enrichment_status: enrichmentStatus,
+              needs_enrichment: enrichmentStatus !== 'completed',
             })
             .eq('id', startup.id);
           
@@ -383,34 +433,80 @@ async function enrichStartup(startup: StartupRecord): Promise<boolean> {
           }
           
           console.log(`  ✅ Enriched with: ${Object.keys(basicUpdates).join(', ')}`);
-          return true;
+          console.log(`  📊 Quality: ${quality.status} (${(quality.overallScore * 100).toFixed(0)}%)`);
+          return enrichmentStatus !== 'failed';
         }
         throw error;
       }
       
-      console.log(`  ✅ Enriched with: ${Object.keys(safeUpdates).join(', ')}`);
-      return true;
+      const updatedFields = Object.keys(safeUpdates);
+      if (updatedFields.length > 0) {
+        console.log(`  ✅ Enriched with: ${updatedFields.join(', ')}`);
+      }
+      console.log(`  📊 Quality: ${quality.status} (${(quality.overallScore * 100).toFixed(0)}%)`);
+      console.log(`  📋 Status: ${enrichmentStatus}`);
+      return enrichmentStatus !== 'failed';
     } else {
-      // No new data found, mark as completed anyway
-      await supabase
+      // No new data found, but still calculate and update quality
+      const qualityUpdates: any = {
+        enrichment_quality_score: quality.overallScore,
+        enrichment_quality_status: quality.status,
+        enrichment_status: enrichmentStatus,
+        needs_enrichment: enrichmentStatus !== 'completed',
+      };
+      
+      const { error } = await supabase
         .from('startups')
-        .update({
-          needs_enrichment: false,
-          enrichment_status: 'completed',
-        })
+        .update(qualityUpdates)
         .eq('id', startup.id);
       
+      if (error && !error.message?.includes('enrichment_quality')) {
+        // If quality columns don't exist, just update status
+        await supabase
+          .from('startups')
+          .update({
+            enrichment_status: enrichmentStatus,
+            needs_enrichment: enrichmentStatus !== 'completed',
+          })
+          .eq('id', startup.id);
+      }
+      
       console.log(`  ℹ️  No additional data found`);
-      return true;
+      console.log(`  📊 Quality: ${quality.status} (${(quality.overallScore * 100).toFixed(0)}%)`);
+      console.log(`  📋 Status: ${enrichmentStatus}`);
+      return enrichmentStatus !== 'failed';
     }
   } catch (error) {
     console.error(`  ❌ Error enriching ${startup.name}:`, error);
     
-    // Mark as failed
-    await supabase
-      .from('startups')
-      .update({ enrichment_status: 'failed' })
-      .eq('id', startup.id);
+    // Calculate quality even on error to see what we got
+    try {
+      const enrichedData = await searchWebForStartup(startup).catch(() => ({}));
+      const updates = mergeEnrichedData(startup, enrichedData);
+      const confidence: Record<string, number> = {};
+      for (const [field, value] of Object.entries(updates)) {
+        if (value) confidence[field] = 0.5; // Lower confidence on error
+      }
+      
+      const mergedData = { ...startup, ...updates };
+      const quality = calculateEnrichmentQuality(mergedData, updates, confidence);
+      console.log(`  📊 Quality before failure: ${getQualitySummary(quality)}`);
+      
+      await supabase
+        .from('startups')
+        .update({
+          enrichment_status: 'failed',
+          enrichment_quality_score: quality.overallScore,
+          enrichment_quality_status: quality.status,
+        })
+        .eq('id', startup.id);
+    } catch (updateError) {
+      // If quality columns don't exist or calculation fails, just update status
+      await supabase
+        .from('startups')
+        .update({ enrichment_status: 'failed' })
+        .eq('id', startup.id);
+    }
     
     return false;
   }
@@ -424,7 +520,7 @@ async function getStartupsNeedingEnrichment(limit: number = 10): Promise<Startup
     .from('startups')
     .select('*')
     .eq('needs_enrichment', true)
-    .in('enrichment_status', ['pending', 'failed'])
+    .in('enrichment_status', ['pending', 'failed', 'needs_review'])
     .limit(limit);
   
   if (error) {

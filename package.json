@@ -22,7 +22,10 @@
     "enrich-startup": "tsx yc_companies/enrich_startup_data.ts",
     "enrich-agentic": "tsx yc_companies/agentic_enrichment.ts",
     "list-startups": "tsx yc_companies/list_startups_for_enrichment.ts",
+    "list-poor-quality": "tsx yc_companies/list_poor_quality_startups.ts",
     "create-test-startup": "tsx yc_companies/create_test_startup.ts",
+    "test:email-discovery": "tsx yc_companies/test_email_discovery.ts",
+    "test:pattern-matching": "tsx yc_companies/test_pattern_matching.ts",
     "type-check": "tsc --noEmit",
     "clean": "powershell -ExecutionPolicy Bypass -File scripts/clean.ps1"
   },
