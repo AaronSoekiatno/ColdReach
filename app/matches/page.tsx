@@ -94,27 +94,26 @@ export default async function MatchesPage() {
   return (
     <section className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 dark:from-zinc-900 dark:via-zinc-950 dark:to-black py-20">
       <div className="container mx-auto px-4 space-y-10">
-        <div className="text-center space-y-3">
-          <p className="text-sm uppercase tracking-[0.3em] text-blue-300 font-semibold">Your Matches</p>
-          <h1 className="text-4xl font-bold text-white">Startups excited to meet you</h1>
-          <p className="text-blue-100">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-blue-300">Startups excited to meet you</h1>
+          <p className="text-white/90 text-lg">
             {typedMatches.length > 0
-              ? `Showing ${typedMatches.length} matched startup${
+              ? `Congrats you matched with ${typedMatches.length} startup${
                   typedMatches.length === 1 ? '' : 's'
-                }.`
+                }!`
               : 'Upload a resume to see personalized startup matches.'}
           </p>
         </div>
 
         {typedMatches.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {typedMatches.map((match) => (
               <MatchCard key={match.id} match={match} />
             ))}
           </div>
         ) : (
           <div className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl p-12 text-center text-white">
-            <p className="text-lg">No matches yet. Upload your resume to get started.</p>
+            <p className="text-lg text-white">No matches yet. Upload your resume to get started.</p>
           </div>
         )}
       </div>
