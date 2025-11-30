@@ -30,6 +30,7 @@
     "clsx": "^2.1.1",
     "csv-parse": "^6.1.0",
     "dotenv": "^17.2.3",
+    "googleapis": "^166.0.0",
     "helix-ts": "^1.0.8",
     "lucide-react": "^0.555.0",
     "mammoth": "^1.11.0",
