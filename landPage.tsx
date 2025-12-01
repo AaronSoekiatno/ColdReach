@@ -9,6 +9,7 @@ import { StartupsCarousel } from "@/components/StartupsCarousel";
 import { Footer } from "@/components/Footer";
 import { SignInModal } from "@/components/SignInModal";
 import { SignUpModal } from "@/components/SignUpModal";
+import { ConnectGmailButton } from "@/components/ConnectGmailButton";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,9 @@ export const Hero = () => {
   const [matchCount, setMatchCount] = useState<number>(0);
   const [pendingResumeData, setPendingResumeData] = useState<any>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [showGmailConnectModal, setShowGmailConnectModal] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [hasCheckedGmail, setHasCheckedGmail] = useState(false);
   const { toast } = useToast();
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -74,8 +78,29 @@ export const Hero = () => {
       // Use session user if available, otherwise fall back to getUser
       setUser(session?.user ?? currentUser ?? null);
       
+      // Check for Gmail connection success
+      if (urlParams.get('gmail_connected') === 'true') {
+        setGmailConnected(true);
+        setShowGmailConnectModal(false);
+        toast({
+          title: "Gmail connected!",
+          description: "You can now send emails directly from your account.",
+        });
+      }
+      
+      // Check if user needs to sign in to connect Gmail
+      if (urlParams.get('error') === 'please_sign_in' && urlParams.get('action') === 'connect_gmail') {
+        if (!currentUser) {
+          setIsSignInModalOpen(true);
+          toast({
+            title: "Please sign in",
+            description: "You need to sign in to connect your Gmail account.",
+          });
+        }
+      }
+      
       // Clean up URL if we came from auth callback
-      if (isAuthCallback) {
+      if (isAuthCallback || urlParams.has('gmail_connected') || urlParams.has('error')) {
         // Remove query params and hash
         window.history.replaceState({}, '', window.location.pathname);
       }
@@ -88,6 +113,13 @@ export const Hero = () => {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
+
+      // If user just signed in, check Gmail connection status
+      if (event === 'SIGNED_IN' && newUser) {
+        // Reset check state so we check again
+        setHasCheckedGmail(false);
+        // checkGmailConnection will be called by the useEffect
+      }
 
       // If user just signed in and we have pending resume data, save it
       if (
@@ -121,6 +153,13 @@ export const Hero = () => {
           console.error('Failed to save resume after sign-in:', error);
         }
       }
+
+      // If user signed out, reset Gmail connection state
+      if (event === 'SIGNED_OUT') {
+        setGmailConnected(false);
+        setHasCheckedGmail(false);
+        setShowGmailConnectModal(false);
+      }
     });
 
     return () => {
@@ -130,6 +169,54 @@ export const Hero = () => {
       }
     };
   }, [pendingResumeData, uploadedFile, toast]);
+
+  // Check Gmail connection status
+  const checkGmailConnection = async () => {
+    if (!user) {
+      setHasCheckedGmail(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/gmail/status', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const connected = data.connected && !data.expired;
+        setGmailConnected(connected);
+        
+        // If not connected and we've checked, show modal after a delay
+        if (!connected) {
+          setTimeout(() => {
+            setShowGmailConnectModal(true);
+          }, 1500);
+        }
+      } else {
+        setGmailConnected(false);
+        setTimeout(() => {
+          setShowGmailConnectModal(true);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Failed to check Gmail connection:', error);
+      setGmailConnected(false);
+      setTimeout(() => {
+        setShowGmailConnectModal(true);
+      }, 1500);
+    } finally {
+      setHasCheckedGmail(true);
+    }
+  };
+
+  // Check Gmail connection when user is available
+  useEffect(() => {
+    if (user && !hasCheckedGmail) {
+      void checkGmailConnection();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const startProgressSimulation = () => {
     if (progressIntervalRef.current) {
@@ -289,6 +376,50 @@ export const Hero = () => {
             </div>
           )}
         </div>
+
+        {/* Gmail Connection Modal */}
+        <Dialog open={showGmailConnectModal} onOpenChange={setShowGmailConnectModal}>
+          <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-semibold text-white text-center">
+                Connect Gmail to Send Emails
+              </DialogTitle>
+              <DialogDescription className="text-white/60 text-center">
+                Connect your Gmail account to send personalized emails to startup founders with one click.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="bg-gray-900/50 border border-white/10 rounded-lg p-4">
+                <p className="text-white/80 text-sm mb-2">
+                  <strong className="text-white">Why connect Gmail?</strong>
+                </p>
+                <ul className="text-white/60 text-sm space-y-1 list-disc list-inside">
+                  <li>Send emails directly from your Gmail account</li>
+                  <li>No need to copy and paste generated emails</li>
+                  <li>One-click email sending to matched startups</li>
+                </ul>
+              </div>
+              <ConnectGmailButton
+                onConnected={() => {
+                  setGmailConnected(true);
+                  setShowGmailConnectModal(false);
+                  toast({
+                    title: "Gmail connected!",
+                    description: "You can now send emails directly from your account.",
+                  });
+                }}
+                className="w-full"
+              />
+              <Button
+                variant="ghost"
+                onClick={() => setShowGmailConnectModal(false)}
+                className="w-full text-white/60 hover:text-white hover:bg-gray-900"
+              >
+                Maybe later
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Sign In Modal */}
         <SignInModal 

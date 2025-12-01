@@ -53,18 +53,53 @@ export const ConnectGmailButton = ({
       checkConnection();
     });
 
+    // Check for Gmail connection success in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('gmail_connected') === 'true') {
+      setTimeout(() => {
+        checkConnection();
+        if (onConnected) {
+          onConnected();
+        }
+      }, 500);
+    }
+
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [onConnected]);
 
   const handleConnectGmail = async () => {
     try {
       setIsConnecting(true);
       
-      // Redirect to Gmail OAuth
-      window.location.href = '/api/auth/gmail/connect';
+      // Get session with access token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session || !session.user) {
+        toast({
+          title: "Please sign in",
+          description: "You need to be signed in to connect Gmail.",
+          variant: "destructive",
+        });
+        setIsConnecting(false);
+        return;
+      }
+      
+      if (!session.access_token) {
+        toast({
+          title: "Session expired",
+          description: "Please sign in again.",
+          variant: "destructive",
+        });
+        setIsConnecting(false);
+        return;
+      }
+      
+      // Pass access token as query parameter (server will validate it)
+      window.location.href = `/api/auth/gmail/connect?token=${encodeURIComponent(session.access_token)}`;
     } catch (error) {
+      console.error('Connect Gmail error:', error);
       toast({
         title: "Connection failed",
         description: "Failed to connect Gmail. Please try again.",
