@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Features } from "@/components/Features";
 import { StartupsCarousel } from "@/components/StartupsCarousel";
 import { Footer } from "@/components/Footer";
+import { HowItWorksJourney } from "@/components/HowItWorksJourney";
 import { SignInModal } from "@/components/SignInModal";
 import { SignUpModal } from "@/components/SignUpModal";
 import {
@@ -548,47 +549,18 @@ export const Hero = () => {
               <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
                 Land Your Dream Internship
               </h1>
-              <p className="text-xl md:text-2xl text-white/80 max-w-2xl mx-auto">
-                AI-powered resume distribution to top startups with personalized messages
+              <p className="text-md md:text-xl text-white/80 max-w-2xl mx-auto">
+                Matches you with top startups, crafts personalized cold DMs, and saves you hours on professional outreach
               </p>
-            </div>
-
-            {/* Resume Upload Section */}
-            <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 max-w-md mx-auto">
-              <h2 className="text-white text-lg mb-4">Upload your resume here.</h2>
-              <div className="relative">
-                <input
-                  id="resume"
-                  type="file"
-                  accept=".pdf,.docx"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  ref={fileInputRef}
-                />
-                <div className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-lg p-3">
-                  <label
-                    htmlFor="resume"
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded cursor-pointer transition-colors text-sm font-medium"
-                  >
-                    Choose File
-                  </label>
-                  <span className="text-white/60 text-sm flex-1">
-                    {file ? file.name : "No file chosen"}
-                  </span>
-                  {file && (
-                    <button
-                      onClick={handleRemoveFile}
-                      className="text-white/60 hover:text-white transition-colors"
-                      aria-label="Remove file"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-                <p className="text-white/60 text-xs mt-2 text-center">
-                  .pdf and .docx only
-                </p>
-              </div>
+              <Button
+                onClick={() => {
+                  const uploadSection = document.getElementById('resume-upload-section');
+                  uploadSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="mt-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-400 hover:to-blue-500 px-8 py-6 text-lg font-semibold rounded-xl transition-all hover:scale-105"
+              >
+                Get Your Internship
+              </Button>
             </div>
           </div>
         </div>
@@ -599,16 +571,53 @@ export const Hero = () => {
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl font-semibold text-white text-center">
-              Matching you with startups
+              Creating YOUR Matches
             </DialogTitle>
             <DialogDescription className="text-white/60 text-center">
-              Hang tight while we analyze your resume
+              Hang tight while we work our magic
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
+          <div className="space-y-6 mt-6">
+            {/* Journey Steps */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 10 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                  {uploadProgress > 10 ? '✓' : '1'}
+                </div>
+                <span className={`text-sm ${uploadProgress > 10 ? 'text-white' : 'text-white/60'}`}>
+                  Analyzing YOUR resume...
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 40 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                  {uploadProgress > 40 ? '✓' : '2'}
+                </div>
+                <span className={`text-sm ${uploadProgress > 40 ? 'text-white' : 'text-white/60'}`}>
+                  Finding aligned startups...
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 70 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                  {uploadProgress > 70 ? '✓' : '3'}
+                </div>
+                <span className={`text-sm ${uploadProgress > 70 ? 'text-white' : 'text-white/60'}`}>
+                  Preparing personalized messages...
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress >= 100 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                  {uploadProgress >= 100 ? '✓' : '4'}
+                </div>
+                <span className={`text-sm ${uploadProgress >= 100 ? 'text-white' : 'text-white/60'}`}>
+                  Ready to review YOUR matches!
+                </span>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
             <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
               <div
-                className="h-full bg-white transition-all duration-200"
+                className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-200"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
@@ -624,14 +633,31 @@ export const Hero = () => {
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md text-center space-y-6">
           <DialogHeader>
             <DialogTitle className="text-3xl font-semibold text-white">
-              We've matched you!
+              YOUR Matches Are Ready!
             </DialogTitle>
             <DialogDescription className="text-lg text-white">
-              You've matched with {matchCount} startup{matchCount !== 1 ? 's' : ''}
+              We found {matchCount} startup{matchCount !== 1 ? 's' : ''} that align{matchCount === 1 ? 's' : ''} with YOUR background and crafted personalized messages for each one.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Journey Completion Checklist */}
+          <div className="bg-white/5 rounded-2xl p-4 space-y-2 text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
+              <span className="text-sm text-white">{matchCount} perfect-fit startup{matchCount !== 1 ? 's' : ''} matched</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
+              <span className="text-sm text-white">Personalized cold DMs ready to send</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-xs">→</div>
+              <span className="text-sm text-white/80">Just connect Gmail to automate outreach</span>
+            </div>
+          </div>
+
           <div className="text-white/70 text-sm">
-            Preview your tailored startup matches and follow up with the teams that excite you.
+            Review YOUR personalized matches and send emails with one click.
           </div>
           <Button
             className="w-full bg-white text-black hover:bg-white/90"
@@ -684,7 +710,7 @@ export const Hero = () => {
               }
             }}
           >
-            Continue to review
+            Review YOUR Matches
           </Button>
         </DialogContent>
       </Dialog>
@@ -708,11 +734,61 @@ export const Hero = () => {
         </DialogContent>
       </Dialog>
 
+      {/* How It Works Journey Section */}
+      <HowItWorksJourney />
+
       {/* Startups Carousel Section */}
       <StartupsCarousel />
 
       {/* Features Section */}
       <Features />
+
+      {/* Resume Upload Section */}
+      <section className="py-20 bg-gradient-to-br from-black via-gray-900 to-gray-800">
+        <div className="container mx-auto px-4">
+          <div className="max-w-md mx-auto">
+            <div id="resume-upload-section" className="animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+              <h2 className="text-white text-lg mb-4 text-center">Upload your resume here.</h2>
+              <div className="relative">
+                <input
+                  id="resume"
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  ref={fileInputRef}
+                />
+                <div className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-lg p-3">
+                  <label
+                    htmlFor="resume"
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded cursor-pointer transition-colors text-sm font-medium"
+                  >
+                    Choose File
+                  </label>
+                  <span className="text-white/60 text-sm flex-1">
+                    {file ? file.name : "No file chosen"}
+                  </span>
+                  {file && (
+                    <button
+                      onClick={handleRemoveFile}
+                      className="text-white/60 hover:text-white transition-colors"
+                      aria-label="Remove file"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-white/60 text-xs mt-2 text-center">
+                  .pdf and .docx only
+                </p>
+                <p className="text-white/70 text-sm mt-4 text-center font-medium">
+                  One resume upload → Personalized outreach to dozens of startups
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Footer Section */}
       <Footer />

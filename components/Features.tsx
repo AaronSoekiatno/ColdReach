@@ -1,28 +1,23 @@
 "use client";
 
-import { Bot, Mail, Target, Zap } from "lucide-react";
+import { Target, Zap, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const features = [
   {
-    icon: Bot,
-    title: "AI-Powered Personalization",
-    description: "Our AI crafts unique, compelling messages for each startup based on your profile and their culture."
-  },
-  {
     icon: Target,
-    title: "Targeted Distribution",
-    description: "We connect you with top startups actively seeking interns in your field of interest."
+    title: "Only Startups That Want YOU",
+    description: "We only show matches above 45% similarity. No spam, no wasted effort—just companies excited about YOUR profile."
   },
   {
-    icon: Mail,
-    title: "Professional Outreach",
-    description: "Automated email campaigns that maintain professionalism while maximizing your reach."
+    icon: Sparkles,
+    title: "Cold DMs That Actually Get Replies",
+    description: "Our AI researches each startup and crafts genuine conversation starters, expresses interest with specific details, and highlights why YOU're the perfect fit."
   },
   {
     icon: Zap,
-    title: "Save 95% of Your Time",
-    description: "Send your resume to hundreds of startups in minutes instead of spending weeks manually applying. What takes 40+ hours normally takes just 5 minutes with Resume Sender."
+    title: "40 Hours → 5 Minutes",
+    description: "Upload once, connect Gmail, and we handle everything. No more copying resumes, no more tracking spreadsheets, no more manual follow-ups."
   }
 ];
 
@@ -35,11 +30,11 @@ export const Features = () => {
             Why Choose ColdReach?
           </h2>
           <p className="text-lg text-white/80">
-            Leverage cutting-edge AI technology to stand out from the crowd
+            To effortlessly land the job before everyone else
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-6xl mx-auto">
           {features.map((feature, index) => (
             <Card 
               key={index} 
