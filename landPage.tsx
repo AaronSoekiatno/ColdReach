@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -25,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import logo from "./images/logo.png";
 
 const SAMPLE_MATCHED_STARTUPS = [
   "Anthropic",
@@ -252,9 +254,12 @@ export const Hero = () => {
         <div className="container mx-auto px-8 py-3 flex items-center justify-between">
           {/* Logo and Title */}
           <Link href="/" className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">C</span>
-            </div>
+            <Image
+              src={logo}
+              alt="ColdReach logo"
+              className="h-9 w-auto rounded-lg"
+              priority
+            />
             <span className="text-white font-semibold text-2xl">ColdReach</span>
           </Link>
 
