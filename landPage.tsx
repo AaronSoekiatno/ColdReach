@@ -571,11 +571,8 @@ export const Hero = () => {
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl font-semibold text-white text-center">
-              Creating YOUR Matches
+              Matching you with startups
             </DialogTitle>
-            <DialogDescription className="text-white/60 text-center">
-              Hang tight while we work our magic
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 mt-6">
             {/* Journey Steps */}
@@ -609,7 +606,7 @@ export const Hero = () => {
                   {uploadProgress >= 100 ? '✓' : '4'}
                 </div>
                 <span className={`text-sm ${uploadProgress >= 100 ? 'text-white' : 'text-white/60'}`}>
-                  Ready to review YOUR matches!
+                  Ready to review your matches!
                 </span>
               </div>
             </div>
@@ -617,7 +614,7 @@ export const Hero = () => {
             {/* Progress Bar */}
             <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-200"
+                className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-200"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
@@ -633,31 +630,12 @@ export const Hero = () => {
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md text-center space-y-6">
           <DialogHeader>
             <DialogTitle className="text-3xl font-semibold text-white">
-              YOUR Matches Are Ready!
+            You matched with {matchCount} startup{matchCount !== 1 ? 's' : ''}
             </DialogTitle>
-            <DialogDescription className="text-lg text-white">
-              We found {matchCount} startup{matchCount !== 1 ? 's' : ''} that align{matchCount === 1 ? 's' : ''} with YOUR background and crafted personalized messages for each one.
-            </DialogDescription>
           </DialogHeader>
 
-          {/* Journey Completion Checklist */}
-          <div className="bg-white/5 rounded-2xl p-4 space-y-2 text-left">
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
-              <span className="text-sm text-white">{matchCount} perfect-fit startup{matchCount !== 1 ? 's' : ''} matched</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
-              <span className="text-sm text-white">Personalized cold DMs ready to send</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-xs">→</div>
-              <span className="text-sm text-white/80">Just connect Gmail to automate outreach</span>
-            </div>
-          </div>
-
           <div className="text-white/70 text-sm">
-            Review YOUR personalized matches and send emails with one click.
+            Review your personalized matches and send emails with one click.
           </div>
           <Button
             className="w-full bg-white text-black hover:bg-white/90"
@@ -710,7 +688,7 @@ export const Hero = () => {
               }
             }}
           >
-            Review YOUR Matches
+            Review Your Matches
           </Button>
         </DialogContent>
       </Dialog>
