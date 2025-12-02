@@ -157,18 +157,55 @@ async function scrapeYCCompanyPage(page: Page, ycUrl: string): Promise<YCPageDat
   try {
     console.log(`   Navigating to: ${ycUrl}`);
     
-    // Navigate with better error handling
-    try {
-      await page.goto(ycUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-    } catch (navError) {
-      console.error(`   ⚠️  Navigation error: ${navError instanceof Error ? navError.message : String(navError)}`);
-      // Try with domcontentloaded as fallback
+    // Check if page is still attached
+    if (page.isClosed()) {
+      throw new Error('Page is closed');
+    }
+    
+    // Navigate with better error handling and retry logic
+    let navigationSuccess = false;
+    let navError: any = null;
+    
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        await page.goto(ycUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      } catch (fallbackError) {
-        console.error(`   ❌ Failed to load page: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
-        return null;
+        // Check if page is still attached before navigation
+        if (page.isClosed()) {
+          throw new Error('Page was closed before navigation');
+        }
+        
+        await page.goto(ycUrl, { 
+          waitUntil: attempt === 0 ? 'networkidle2' : 'domcontentloaded', 
+          timeout: 30000 
+        });
+        
+        // Wait a bit after navigation to ensure stability
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        navigationSuccess = true;
+        break;
+      } catch (error: any) {
+        navError = error;
+        const errorMsg = error?.message || String(error);
+        
+        // If it's a detached frame error, wait and try again
+        if (errorMsg.includes('detached') || errorMsg.includes('Target closed')) {
+          console.warn(`   ⚠️  Detached frame error (attempt ${attempt + 1}/3), retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+        
+        // For other errors, try with domcontentloaded on next attempt
+        if (attempt < 2) {
+          console.warn(`   ⚠️  Navigation error (attempt ${attempt + 1}/3): ${errorMsg}`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
       }
+    }
+    
+    if (!navigationSuccess) {
+      console.error(`   ❌ Failed to load page after 3 attempts: ${navError instanceof Error ? navError.message : String(navError)}`);
+      return null;
     }
 
     // Wait for content to load
@@ -208,6 +245,11 @@ async function scrapeYCCompanyPage(page: Page, ycUrl: string): Promise<YCPageDat
       return null;
     }
 
+    // Check if page is still attached before evaluation
+    if (page.isClosed()) {
+      throw new Error('Page was closed before evaluation');
+    }
+
     const pageData = await page.evaluate(() => {
       try {
       const data: YCPageData = {
@@ -222,22 +264,151 @@ async function scrapeYCCompanyPage(page: Page, ycUrl: string): Promise<YCPageDat
       // ============================================
       // 1. EXTRACT FOUNDERS WITH DESCRIPTIONS
       // ============================================
-      // Strategy: Find "Active Founders" section, then extract from actual YC page structure
-      // YC uses: <div class="text-xl font-bold"> for names and <div class="prose max-w-full whitespace-pre-line"> for descriptions
+      // Strategy: Multiple approaches with increasing complexity
+      // 1. Simple text-based extraction (most reliable)
+      // 2. CSS selector-based extraction
+      // 3. Fallback text extraction
       
       // First, get the company name to filter it out
       const companyName = (document.querySelector('h1')?.textContent?.trim() || '').toLowerCase();
       
-      // Find "Active Founders" heading
+      // PRIORITY METHOD: Simple text-based extraction FIRST (before CSS selectors)
+      // This is more reliable because it doesn't depend on CSS classes or HTML structure
+      // Works whether "Active Founders" is in a heading, div, span, or any element
+      const bodyText = document.body.textContent || '';
+      const bodyLower = bodyText.toLowerCase();
+      
+      // Find "Active Founders" or "Founders" in the raw text (works for any element type)
+      let simpleExtractionIndex = bodyLower.indexOf('active founders');
+      if (simpleExtractionIndex < 0) {
+        simpleExtractionIndex = bodyLower.indexOf('founders');
+      }
+      
+      if (simpleExtractionIndex >= 0) {
+        // Get text after "Active Founders" (works whether it's in a div, heading, or any element)
+        const sectionText = bodyText.slice(simpleExtractionIndex);
+        const lines = sectionText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        
+        // Look through first 30 lines after "Active Founders" to find founder names
+        for (let i = 1; i < Math.min(31, lines.length); i++) {
+          const line = lines[i];
+          
+          // Skip if we hit another section
+          if (line.match(/^(Company|Location|Jobs|Team|Status|Founded|Website|Batch):?$/i)) break;
+          
+          // Pattern: Line is exactly a name (First Last or First Middle Last)
+          const namePattern = /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+[A-Z][a-z]+)$/;
+          const nameMatch = line.match(namePattern);
+          
+          if (nameMatch) {
+            const fullName = nameMatch[1];
+            const nameParts = fullName.split(/\s+/);
+            
+            // Must be 2-4 words
+            if (nameParts.length >= 2 && nameParts.length <= 4) {
+              // Skip if it's the company name
+              if (fullName.toLowerCase() === companyName) continue;
+              
+              // Skip common words
+              const skipWords = ['Active', 'Founders', 'Founder', 'Company', 'Location', 
+                                'Team', 'Size', 'Jobs', 'Status', 'Founded', 'Website', 'Batch',
+                                'San Francisco', 'New York', 'Remote', 'United States'];
+              if (skipWords.some(word => fullName.toLowerCase().includes(word.toLowerCase()))) continue;
+              
+              // Get description from next line
+              let description = '';
+              if (i + 1 < lines.length) {
+                const nextLine = lines[i + 1];
+                if (nextLine.length > 15 && nextLine.length < 500 &&
+                    !nextLine.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+$/) && // Not another name
+                    !nextLine.match(/^(Company|Location|Jobs):?$/i) && // Not a heading
+                    (nextLine.includes('Building') || nextLine.includes('Prior') || 
+                     nextLine.match(/\b(at|from|worked|led)\b/i))) {
+                  description = nextLine;
+                }
+              }
+              
+              // Try to find LinkedIn link
+              let linkedIn = '';
+              const allLinkedInLinks = Array.from(document.querySelectorAll('a[href*="linkedin.com/in/"]'));
+              
+              // Find links that appear after the founders section
+              const linkIndex = bodyText.indexOf('linkedin.com/in/');
+              if (linkIndex > simpleExtractionIndex && linkIndex < simpleExtractionIndex + 3000) {
+                for (const link of allLinkedInLinks) {
+                  const linkHref = (link as HTMLAnchorElement).href;
+                  const linkText = link.textContent || '';
+                  const linkNearbyText = link.parentElement?.textContent || '';
+                  
+                  // If the link is near this name
+                  if (linkNearbyText.toLowerCase().includes(fullName.toLowerCase().split(' ')[0]) ||
+                      linkText.toLowerCase().includes(nameParts[0].toLowerCase())) {
+                    linkedIn = linkHref;
+                    break;
+                  }
+                }
+              }
+              
+              const firstName = nameParts[0];
+              const lastName = nameParts.slice(1).join(' ');
+              
+              // Add to founders (will deduplicate later)
+              data.founders.push({
+                firstName,
+                lastName,
+                linkedIn,
+                description: description || undefined,
+              });
+            }
+          }
+        }
+      }
+      
+      // If we already found founders with simple extraction, skip CSS-based extraction
+      // Otherwise, continue with CSS selector-based approach below
+      
+      // Find "Active Founders" section - can be in ANY element (heading, div, span, etc.)
+      let foundersHeading: Element | null = null;
+      
+      // Method 1: Search ALL elements for "Active Founders" text (not just headings!)
+      const allElements = Array.from(document.querySelectorAll('*'));
+      foundersHeading = allElements.find(el => {
+        const text = el.textContent?.trim() || '';
+        // Match if text is exactly "Active Founders" or contains it
+        // This works for divs, spans, headings, or any element
+        return text.toLowerCase() === 'active founders' ||
+               text.toLowerCase().includes('active founders');
+      }) || null;
+      
+      // Method 2: If not found, try just "Founders"
+      if (!foundersHeading) {
+        foundersHeading = allElements.find(el => {
+          const text = el.textContent?.trim() || '';
+          return text.toLowerCase() === 'founders';
+        }) || null;
+      }
+      
+      // Method 3: Look in headings as fallback
+      if (!foundersHeading) {
       const allHeadings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
-      const foundersHeading = allHeadings.find(h => {
+        foundersHeading = allHeadings.find(h => {
         const text = h.textContent?.trim() || '';
         return text.toLowerCase().includes('active founders') || 
                text.toLowerCase() === 'founders';
-      });
+        }) || null;
+      }
       
       // Track seen founders to avoid duplicates
       const seenFounders = new Set<string>(); // Track by LinkedIn URL or full name
+      
+      // If we already found founders with simple extraction, mark them as seen for deduplication
+      for (const founder of data.founders) {
+        const key = founder.linkedIn || `${founder.firstName} ${founder.lastName}`.toLowerCase();
+        seenFounders.add(key);
+      }
+      
+      // Continue with CSS selector-based extraction (may find additional founders)
+      // Final deduplication will handle duplicates
 
       // Find the container with founder cards
       let foundersContainer: Element | null = null;
@@ -353,8 +524,8 @@ async function scrapeYCCompanyPage(page: Page, ycUrl: string): Promise<YCPageDat
                   break;
                 } else if (!isInFoundersSection && 
                           (pText.includes('Co-founder') || pText.includes('Founder') || looksLikeBio)) {
-                  description = pText;
-                  break;
+                description = pText;
+                break;
                 }
               }
             }
@@ -493,99 +664,233 @@ async function scrapeYCCompanyPage(page: Page, ycUrl: string): Promise<YCPageDat
       
       // Enhanced Fallback 1: If we found Active Founders heading but no founders, use text-based extraction
       if (data.founders.length === 0 && foundersHeading) {
-        // Get all elements after the heading
-        const allElements = Array.from(document.querySelectorAll('*'));
-        const headingIndex = allElements.indexOf(foundersHeading);
+        // More aggressive text-based extraction - get all text after the heading
+        let sectionText = '';
+        let currentElement: Element | null = foundersHeading.nextElementSibling;
         
-        // Look at elements after the heading (within reasonable range)
-        const candidateElements = allElements.slice(headingIndex + 1, headingIndex + 100);
+        // Collect text from the next several siblings
+        for (let i = 0; i < 20 && currentElement; i++) {
+          const text = currentElement.textContent?.trim() || '';
+          if (text) {
+            sectionText += ' ' + text;
+          }
+          currentElement = currentElement.nextElementSibling;
+        }
         
-        for (const element of candidateElements) {
-          // Look for divs or sections that might contain founder info
-          if (element.tagName === 'DIV' || element.tagName === 'SECTION') {
-            const text = element.textContent?.trim() || '';
+        // Also try getting text from parent's children after the heading
+        if (sectionText.length < 100 && foundersHeading.parentElement) {
+          const parent = foundersHeading.parentElement;
+          const headingIndex = Array.from(parent.children).indexOf(foundersHeading);
+          const siblings = Array.from(parent.children).slice(headingIndex + 1, headingIndex + 10);
+          
+          for (const sibling of siblings) {
+            const text = sibling.textContent?.trim() || '';
+            if (text) {
+              sectionText += ' ' + text;
+            }
+          }
+        }
+        
+        // Extract all potential names using multiple patterns
+        const namePatterns = [
+          /\b([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/g,  // "First Last" or "First Middle Last"
+          /^([A-Z][a-z]+\s+[A-Z][a-z]+)$/gm,  // Standalone names on lines
+        ];
+        
+        const foundNames = new Set<string>();
+        
+        for (const pattern of namePatterns) {
+          const matches = sectionText.match(pattern);
+          if (matches) {
+            matches.forEach(match => {
+              const name = match.trim();
+              if (name.length >= 3 && name.length <= 100) {
+                foundNames.add(name);
+              }
+            });
+          }
+        }
+        
+        // Process each found name
+        for (const potentialName of foundNames) {
+          const nameParts = potentialName.split(/\s+/);
+          
+          // Validate it looks like a name
+          if (nameParts.length >= 2 && nameParts.length <= 4) {
+            // Skip if it's the company name
+            if (potentialName.toLowerCase() === companyName) continue;
             
-            // Extract potential names using regex
-            // Pattern: "First Last" or "First Middle Last" - capitalized words
-            const nameMatches = text.match(/\b([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/g);
+            // Skip common words/phrases
+            const commonWords = ['Active', 'Founders', 'Founder', 'Company', 'Location', 'Team', 'Size', 
+                                'San Francisco', 'New York', 'Remote', 'United States'];
+            if (commonWords.some(word => potentialName.toLowerCase().includes(word.toLowerCase()))) continue;
             
-            if (nameMatches) {
-              for (const match of nameMatches) {
-                const potentialName = match.trim();
-                const nameParts = potentialName.split(/\s+/);
+            // Skip if it's all caps (likely not a name)
+            if (potentialName === potentialName.toUpperCase() && potentialName.length > 10) continue;
+            
+            // Look for LinkedIn link anywhere after the heading
+            let linkedIn = '';
+            const allLinkedInLinks = Array.from(document.querySelectorAll('a[href*="linkedin.com/in/"]'));
+            
+            // Find LinkedIn links that appear after the Active Founders heading
+            const headingIndex = Array.from(document.querySelectorAll('*')).indexOf(foundersHeading);
+            for (const link of allLinkedInLinks) {
+              const linkIndex = Array.from(document.querySelectorAll('*')).indexOf(link);
+              if (linkIndex > headingIndex && linkIndex < headingIndex + 200) {
+                // Check if this link might belong to this founder
+                const linkContainer = link.closest('div, section, article');
+                const linkText = linkContainer?.textContent || '';
                 
-                // Validate it looks like a name
-                if (nameParts.length >= 2 && nameParts.length <= 4 && 
-                    potentialName.length >= 3 && potentialName.length <= 100) {
-                  
-                  // Skip if it's the company name
-                  if (potentialName.toLowerCase() === companyName) continue;
-                  // Skip common words
-                  const commonWords = ['Active', 'Founders', 'Founder', 'Company', 'Location', 'Team', 'Size'];
-                  if (commonWords.some(word => potentialName.toLowerCase().includes(word.toLowerCase()))) continue;
-                  
-                  // Look for LinkedIn link in this element or nearby
-                  let linkedIn = '';
-                  const linkedInLink = element.querySelector('a[href*="linkedin.com/in/"]') as HTMLAnchorElement;
-                  if (linkedInLink) {
-                    linkedIn = linkedInLink.href;
-                  } else {
-                    // Search more broadly in nearby elements
-                    const allLinkedInLinks = Array.from(document.querySelectorAll('a[href*="linkedin.com/in/"]'));
-                    for (const link of allLinkedInLinks) {
-                      const linkElement = link as HTMLAnchorElement;
-                      // Check if link is near this element (within reasonable distance)
-                      const linkContainer = linkElement.closest('div, section, article');
-                      const nameContainer = element.closest('div, section, article');
-                      if (linkContainer && nameContainer && 
-                          (linkContainer === nameContainer || linkContainer.contains(nameContainer) || nameContainer.contains(linkContainer))) {
-                        linkedIn = linkElement.href;
-                        break;
-                      }
-                    }
+                // If the name appears near this LinkedIn link, associate them
+                if (linkText.toLowerCase().includes(potentialName.toLowerCase().split(' ')[0])) {
+                  linkedIn = (link as HTMLAnchorElement).href;
+                  break;
+                }
+              }
+            }
+            
+            // Extract description - look for text after the name that looks like a bio
+            let description = '';
+            const lines = sectionText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            
+            for (let i = 0; i < lines.length; i++) {
+              if (lines[i].includes(potentialName)) {
+                // Look at lines after the name for description
+                for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+                  const line = lines[j];
+                  if (line.length > 20 && line.length < 500 &&
+                      line !== potentialName &&
+                      !line.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+$/) && // Not another name
+                      (line.includes('Building') || line.includes('Prior') || 
+                       line.includes('studied') || line.match(/\b(at|from|worked|led)\b/i))) {
+                    description = line;
+                    break;
                   }
-                  
-                  // Extract description/background from this element or nearby
-                  let description = '';
-                  const paragraphs = element.querySelectorAll('p');
-                  for (const p of Array.from(paragraphs)) {
-                    const pText = p.textContent?.trim() || '';
-                    // Accept any descriptive text that looks like a bio
-                    if (pText.length > 20 && pText.length < 1000 && 
-                        pText !== potentialName &&
-                        (pText.includes('Building') || pText.includes('Prior') || 
-                         pText.includes('studied') || pText.match(/\b(at|from|worked)\b/i))) {
-                      description = pText;
-                      break;
-                    }
+                }
+                break;
+              }
+            }
+            
+            const founderKey = linkedIn || potentialName.toLowerCase();
+            
+            if (!seenFounders.has(founderKey)) {
+              seenFounders.add(founderKey);
+              data.founders.push({
+                firstName: nameParts[0],
+                lastName: nameParts.slice(1).join(' '),
+                linkedIn,
+                description: description || undefined,
+              });
+            }
+          }
+        }
+      }
+      
+      // Ultra-Simple Fallback 2: Direct line-by-line text extraction
+      if (data.founders.length === 0) {
+        // Get all text on the page, split into lines
+        const bodyText = document.body.textContent || '';
+        const lines = bodyText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        
+        // Look for "Active Founders" or just "Founders" in the lines
+        let foundersSectionStart = -1;
+        for (let i = 0; i < lines.length; i++) {
+          const lineLower = lines[i].toLowerCase();
+          if (lineLower.includes('active founders') || lineLower === 'founders') {
+            foundersSectionStart = i;
+            break;
+          }
+        }
+        
+        if (foundersSectionStart >= 0) {
+          // Look at lines after the heading (skip the heading line itself)
+          const sectionLines = lines.slice(foundersSectionStart + 1, foundersSectionStart + 30);
+          
+          for (let i = 0; i < sectionLines.length; i++) {
+            const line = sectionLines[i];
+            
+            // Stop if we hit another section heading
+            if (line.match(/^(Company|Location|Jobs|Team|Status|Founded|Website|Batch):?$/i)) break;
+            
+            // Pattern: Line is exactly "First Last" or "First Middle Last" (2-4 capitalized words)
+            // This matches lines that are standalone names
+            const nameMatch = line.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+[A-Z][a-z]+)$/);
+            
+            if (nameMatch) {
+              const potentialName = nameMatch[1];
+              const nameParts = potentialName.split(/\s+/);
+              
+              // Must be 2-4 words
+              if (nameParts.length >= 2 && nameParts.length <= 4) {
+                // Skip if it's the company name
+                if (potentialName.toLowerCase() === companyName) continue;
+                
+                // Skip common section headings/words
+                const skipWords = ['Active', 'Founders', 'Founder', 'Company', 'Location', 
+                                  'Team', 'Size', 'Jobs', 'Status', 'Founded', 'Website', 'Batch',
+                                  'San Francisco', 'New York', 'Remote', 'United States'];
+                const shouldSkip = skipWords.some(word => {
+                  return potentialName.toLowerCase() === word.toLowerCase() ||
+                         potentialName.toLowerCase().startsWith(word.toLowerCase() + ' ') ||
+                         potentialName.toLowerCase().endsWith(' ' + word.toLowerCase());
+                });
+                
+                if (shouldSkip) continue;
+                
+                // Extract description from next line if available
+                let description = '';
+                if (i + 1 < sectionLines.length) {
+                  const nextLine = sectionLines[i + 1];
+                  // If next line looks like a description (not another name, has descriptive words)
+                  if (nextLine.length > 15 && nextLine.length < 500 &&
+                      !nextLine.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+$/) && // Not another name
+                      !nextLine.match(/^(Company|Location|Jobs|Team|Status):?$/i) && // Not a heading
+                      (nextLine.includes('Building') || 
+                       nextLine.includes('Prior') || 
+                       nextLine.includes('studied') ||
+                       nextLine.match(/\b(at|from|worked|led|co-founded|founded)\b/i))) {
+                    description = nextLine;
                   }
-                  
-                  // Also try div text content
-                  if (!description) {
-                    const divText = element.textContent?.trim() || '';
-                    // Extract description if it's separate from the name
-                    const lines = divText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                    for (const line of lines) {
-                      if (line !== potentialName && line.length > 20 && line.length < 500 &&
-                          (line.includes('Building') || line.includes('Prior') || 
-                           line.match(/\b(at|from|studied|worked)\b/i))) {
-                        description = line;
-                        break;
-                      }
-                    }
-                  }
-                  
-                  const founderKey = linkedIn || potentialName.toLowerCase();
-                  
-                  if (!seenFounders.has(founderKey)) {
-                    seenFounders.add(founderKey);
-                    data.founders.push({
-                      firstName: nameParts[0],
-                      lastName: nameParts.slice(1).join(' '),
-                      linkedIn,
-                      description: description || undefined,
-                    });
-                  }
+                }
+                
+                const firstName = nameParts[0];
+                const lastName = nameParts.slice(1).join(' ');
+                const founderKey = potentialName.toLowerCase();
+                
+                if (!seenFounders.has(founderKey)) {
+                  seenFounders.add(founderKey);
+                  data.founders.push({
+                    firstName,
+                    lastName,
+                    linkedIn: '',
+                    description: description || undefined,
+                  });
+                }
+              }
+            }
+          }
+          
+          // Try to associate LinkedIn links with found founders
+          if (data.founders.length > 0) {
+            const allLinkedInLinks = Array.from(document.querySelectorAll('a[href*="linkedin.com/in/"]'));
+            
+            for (const link of allLinkedInLinks) {
+              const linkElement = link as HTMLAnchorElement;
+              const linkHref = linkElement.href;
+              
+              // Skip navigation/footer links
+              const parent = link.closest('nav, footer, header');
+              if (parent) continue;
+              
+              // Get container text around the link
+              const linkContainer = link.closest('div, section, article, p');
+              const containerText = (linkContainer?.textContent || '').toLowerCase();
+              
+              // Try to match with a founder
+              for (const founder of data.founders) {
+                if (!founder.linkedIn && containerText.includes(founder.firstName.toLowerCase())) {
+                  founder.linkedIn = linkHref;
+                  break;
                 }
               }
             }
@@ -593,7 +898,105 @@ async function scrapeYCCompanyPage(page: Page, ycUrl: string): Promise<YCPageDat
         }
       }
       
-      // Fallback 2: If still no founders found, try finding by LinkedIn links
+      // Ultra-Simple Fallback: Direct text extraction from page body
+      if (data.founders.length === 0) {
+        // Get all text from the page
+        const bodyText = document.body.textContent || '';
+        const bodyLower = bodyText.toLowerCase();
+        
+        // Find "Active Founders" in text
+        const activeFoundersIndex = bodyLower.indexOf('active founders');
+        const foundersIndex = activeFoundersIndex >= 0 ? activeFoundersIndex : bodyLower.indexOf('founders');
+        
+        if (foundersIndex >= 0) {
+          // Get text after "Active Founders" or "Founders"
+          const afterFounders = bodyText.slice(foundersIndex);
+          const lines = afterFounders.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+          
+          // Look through first 30 lines after heading
+          for (let i = 1; i < Math.min(31, lines.length); i++) {
+            const line = lines[i];
+            
+            // Skip empty lines, common headings
+            if (line.length < 3) continue;
+            if (line.toLowerCase().includes('company') || 
+                line.toLowerCase().includes('location') ||
+                line.toLowerCase().includes('jobs')) break; // Stop if we hit another section
+            
+            // Pattern: Line contains just "First Last" (two capitalized words, possibly with middle name)
+            const simpleNamePattern = /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+[A-Z][a-z]+)$/;
+            const nameMatch = line.match(simpleNamePattern);
+            
+            if (nameMatch) {
+              const fullName = nameMatch[1];
+              const nameParts = fullName.split(/\s+/);
+              
+              // Must be 2-4 words (First Last or First Middle Last)
+              if (nameParts.length >= 2 && nameParts.length <= 4) {
+                // Skip if company name
+                if (fullName.toLowerCase() === companyName) continue;
+                
+                // Skip common non-name words
+                const skipWords = ['Active', 'Founders', 'Founder', 'Company', 'Location', 'Team', 'Size',
+                                 'San Francisco', 'New York', 'Remote', 'United States', 'Founded',
+                                 'Website', 'Jobs', 'Batch', 'Status'];
+                if (skipWords.some(word => fullName.toLowerCase().includes(word.toLowerCase()))) continue;
+                
+                // Extract description from next line if it looks like a bio
+                let description = '';
+                if (i + 1 < lines.length) {
+                  const nextLine = lines[i + 1];
+                  if (nextLine.length > 15 && nextLine.length < 500 &&
+                      !nextLine.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+$/) && // Not another name
+                      (nextLine.includes('Building') || 
+                       nextLine.includes('Prior') || 
+                       nextLine.includes('studied') ||
+                       nextLine.match(/\b(at|from|worked|led|co-founded)\b/i))) {
+                    description = nextLine;
+                  }
+                }
+                
+                const firstName = nameParts[0];
+                const lastName = nameParts.slice(1).join(' ');
+                const founderKey = fullName.toLowerCase();
+                
+                if (!seenFounders.has(founderKey)) {
+                  seenFounders.add(founderKey);
+                  data.founders.push({
+                    firstName,
+                    lastName,
+                    linkedIn: '',
+                    description: description || undefined,
+                  });
+                }
+              }
+            }
+          }
+          
+          // Try to associate LinkedIn links
+          if (data.founders.length > 0) {
+            const allLinkedInLinks = Array.from(document.querySelectorAll('a[href*="linkedin.com/in/"]'));
+            
+            for (const link of allLinkedInLinks) {
+              const linkElement = link as HTMLAnchorElement;
+              const linkHref = linkElement.href;
+              
+              // Get text around the link
+              const linkContainer = link.closest('div, section, article, p');
+              const containerText = (linkContainer?.textContent || '').toLowerCase();
+              
+              for (const founder of data.founders) {
+                if (!founder.linkedIn && containerText.includes(founder.firstName.toLowerCase())) {
+                  founder.linkedIn = linkHref;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // Fallback 3: If still no founders found, try finding by LinkedIn links
       if (data.founders.length === 0) {
         const allLinkedInLinks = document.querySelectorAll('a[href*="linkedin.com/in/"]');
         
@@ -693,7 +1096,7 @@ async function scrapeYCCompanyPage(page: Page, ycUrl: string): Promise<YCPageDat
       // ============================================
       // 3. EXTRACT TEAM SIZE
       // ============================================
-      const bodyText = document.body.innerText || '';
+      const bodyTextForTeamSize = document.body.innerText || '';
       const teamSizePatterns = [
         /team\s+size[:\s]+(\d+)/i,
         /(\d+)\s+employees/i,
@@ -701,7 +1104,7 @@ async function scrapeYCCompanyPage(page: Page, ycUrl: string): Promise<YCPageDat
       ];
       
       for (const pattern of teamSizePatterns) {
-        const match = bodyText.match(pattern);
+        const match = bodyTextForTeamSize.match(pattern);
         if (match && match[1]) {
           data.teamSize = match[1];
           break;
