@@ -24,9 +24,9 @@ export const StartupsCarousel = () => {
   ];
 
   return (
-    <section className="py-16 overflow-hidden w-full relative">
-      <div className="w-full max-w-7xl mx-auto px-4">
-        <h3 className="text-center text-2xl font-bold text-white mb-8">
+    <section className="py-10 sm:py-12 md:py-16 overflow-hidden w-full relative">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <h3 className="text-center text-xl sm:text-2xl font-bold text-white mb-6 sm:mb-8 px-2">
           Trusted by UC & CSU campuses
         </h3>
         
@@ -36,14 +36,14 @@ export const StartupsCarousel = () => {
             {startups.map((startup, index) => (
               <div
                 key={`first-${index}`}
-                className="flex-shrink-0 mx-6 px-8 py-6 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg shadow-sm flex items-center justify-center"
+                className="flex-shrink-0 mx-2 sm:mx-4 md:mx-6 px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg shadow-sm flex items-center justify-center"
               >
                 <Image
                   src={startup.logoUrl}
                   alt={startup.name}
                   width={160}
                   height={160}
-                  className="h-16 w-auto object-contain"
+                  className="h-12 sm:h-14 md:h-16 w-auto object-contain"
                   unoptimized
                 />
               </div>
@@ -52,14 +52,14 @@ export const StartupsCarousel = () => {
             {startups.map((startup, index) => (
               <div
                 key={`second-${index}`}
-                className="flex-shrink-0 mx-6 px-8 py-6 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg shadow-sm flex items-center justify-center"
+                className="flex-shrink-0 mx-2 sm:mx-4 md:mx-6 px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg shadow-sm flex items-center justify-center"
               >
                 <Image
                   src={startup.logoUrl}
                   alt={startup.name}
                   width={160}
                   height={160}
-                  className="h-16 w-auto object-contain"
+                  className="h-12 sm:h-14 md:h-16 w-auto object-contain"
                   unoptimized
                 />
               </div>

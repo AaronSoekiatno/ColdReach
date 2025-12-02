@@ -439,16 +439,16 @@ export const Hero = () => {
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800">
       {/* Sticky Header */}
       <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/10 border-b border-white/20">
-        <div className="container mx-auto px-8 py-3 flex items-center justify-between">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8 py-3 flex items-center justify-between">
           {/* Logo and Title */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3">
             <Image
               src={logo}
               alt="ColdReach logo"
-              className="h-9 w-auto rounded-lg"
+              className="h-7 sm:h-8 md:h-9 w-auto rounded-lg"
               priority
             />
-            <span className="text-white font-semibold text-2xl">ColdReach</span>
+            <span className="text-white font-semibold text-lg sm:text-xl md:text-2xl">ColdReach</span>
           </Link>
 
           {/* Sign In Button / Account Indicator */}
@@ -457,21 +457,22 @@ export const Hero = () => {
               <>
                 <Link
                   href="/matches"
-                  className="text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                  className="text-xs sm:text-sm md:text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-2 sm:hover:px-3 hover:py-1 sm:hover:py-1.5 px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none whitespace-nowrap"
                 >
-                  Your Matches
+                  <span className="hidden sm:inline">Your Matches</span>
+                  <span className="sm:hidden">Matches</span>
                 </Link>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none">
-                      <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center font-semibold text-xs">
+                    <button className="flex items-center gap-1 sm:gap-2 text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-2 sm:hover:px-3 hover:py-1 sm:hover:py-1.5 px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none">
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center font-semibold text-xs">
                         {user.email?.[0]?.toUpperCase() ?? "U"}
                       </div>
                       
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="border-white/30 bg-white/10 text-white px-0 py-0 rounded-2xl overflow-hidden min-w-[200px]">
-                    <div className="px-4 py-2 text-sm text-white/80 border-b border-white/10">
+                    <div className="px-4 py-2 text-sm text-white/80 border-b border-white/10 break-words">
                       {user.email}
                     </div>
                     <DropdownMenuItem
@@ -491,16 +492,16 @@ export const Hero = () => {
                 </DropdownMenu>
               </>
             ) : (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
                 <button
                   onClick={() => setIsSignInModalOpen(true)}
-                  className="text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                  className="text-xs sm:text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-2 sm:hover:px-3 hover:py-1 sm:hover:py-1.5 px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none whitespace-nowrap"
                 >
                   Sign In
                 </button>
                 <button
                   onClick={() => setIsSignUpModalOpen(true)}
-                  className="text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                  className="text-xs sm:text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-2 sm:hover:px-3 hover:py-1 sm:hover:py-1.5 px-2 sm:px-3 py-1 sm:py-1.5 focus:outline-none whitespace-nowrap"
                 >
                   Sign Up
                 </button>
@@ -543,13 +544,13 @@ export const Hero = () => {
         />
 
         {/* Content */}
-        <div className="container relative z-10 px-4 py-20">
-          <div className="max-w-4xl mx-auto text-center space-y-12">
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-              <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
+        <div className="container relative z-10 px-4 sm:px-6 md:px-8 py-12 sm:py-16 md:py-20">
+          <div className="max-w-4xl mx-auto text-center space-y-8 sm:space-y-10 md:space-y-12">
+            <div className="space-y-3 sm:space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold text-white leading-tight px-2">
                 Land Your Dream Internship
               </h1>
-              <p className="text-md md:text-xl text-white/80 max-w-2xl mx-auto">
+              <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/80 max-w-2xl mx-auto px-4">
                 Matches you with top startups, crafts personalized cold DMs, and saves you hours on professional outreach
               </p>
               <Button
@@ -557,7 +558,7 @@ export const Hero = () => {
                   const uploadSection = document.getElementById('resume-upload-section');
                   uploadSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
-                className="mt-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-400 hover:to-blue-500 px-8 py-6 text-lg font-semibold rounded-xl transition-all hover:scale-105"
+                className="mt-4 sm:mt-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-400 hover:to-blue-500 px-6 py-4 sm:px-8 sm:py-5 md:px-8 md:py-6 text-base sm:text-lg font-semibold rounded-xl transition-all hover:scale-105"
               >
                 Get Your Internship
               </Button>
@@ -568,57 +569,57 @@ export const Hero = () => {
 
       {/* Upload Progress Modal */}
       <Dialog open={showProgressModal} onOpenChange={() => {}}>
-        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
+        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md mx-4">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-semibold text-white text-center">
+            <DialogTitle className="text-xl sm:text-2xl font-semibold text-white text-center px-2">
               Matching you with startups
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-6 mt-6">
+          <div className="space-y-4 sm:space-y-6 mt-4 sm:mt-6">
             {/* Journey Steps */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 10 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+            <div className="space-y-2 sm:space-y-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${uploadProgress > 10 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
                   {uploadProgress > 10 ? '✓' : '1'}
                 </div>
-                <span className={`text-sm ${uploadProgress > 10 ? 'text-white' : 'text-white/60'}`}>
+                <span className={`text-xs sm:text-sm ${uploadProgress > 10 ? 'text-white' : 'text-white/60'}`}>
                   Analyzing YOUR resume...
                 </span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 40 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${uploadProgress > 40 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
                   {uploadProgress > 40 ? '✓' : '2'}
                 </div>
-                <span className={`text-sm ${uploadProgress > 40 ? 'text-white' : 'text-white/60'}`}>
+                <span className={`text-xs sm:text-sm ${uploadProgress > 40 ? 'text-white' : 'text-white/60'}`}>
                   Finding aligned startups...
                 </span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 70 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${uploadProgress > 70 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
                   {uploadProgress > 70 ? '✓' : '3'}
                 </div>
-                <span className={`text-sm ${uploadProgress > 70 ? 'text-white' : 'text-white/60'}`}>
+                <span className={`text-xs sm:text-sm ${uploadProgress > 70 ? 'text-white' : 'text-white/60'}`}>
                   Preparing personalized messages...
                 </span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress >= 100 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${uploadProgress >= 100 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
                   {uploadProgress >= 100 ? '✓' : '4'}
                 </div>
-                <span className={`text-sm ${uploadProgress >= 100 ? 'text-white' : 'text-white/60'}`}>
+                <span className={`text-xs sm:text-sm ${uploadProgress >= 100 ? 'text-white' : 'text-white/60'}`}>
                   Ready to review your matches!
                 </span>
               </div>
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
+            <div className="w-full h-2 sm:h-3 rounded-full bg-white/10 overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-200"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
-            <p className="text-center text-white/70 text-sm">
+            <p className="text-center text-white/70 text-xs sm:text-sm">
               {Math.round(uploadProgress)}% complete
             </p>
           </div>
@@ -627,18 +628,18 @@ export const Hero = () => {
 
       {/* Results Modal */}
       <Dialog open={showResultsModal} onOpenChange={setShowResultsModal}>
-        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md text-center space-y-6">
+        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md text-center space-y-4 sm:space-y-6 mx-4">
           <DialogHeader>
-            <DialogTitle className="text-3xl font-semibold text-white">
+            <DialogTitle className="text-2xl sm:text-3xl font-semibold text-white px-2">
             You matched with {matchCount} startup{matchCount !== 1 ? 's' : ''}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="text-white/70 text-sm">
+          <div className="text-white/70 text-xs sm:text-sm px-2">
             Review your personalized matches and send emails with one click.
           </div>
           <Button
-            className="w-full bg-white text-black hover:bg-white/90"
+            className="w-full bg-white text-black hover:bg-white/90 text-sm sm:text-base py-2 sm:py-3"
             onClick={async () => {
               setShowResultsModal(false);
               
@@ -695,18 +696,18 @@ export const Hero = () => {
 
       {/* Saving Resume Modal - Shows after sign-in while saving resume */}
       <Dialog open={showSavingModal} onOpenChange={() => {}}>
-        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
+        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md mx-4">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-semibold text-white text-center">
+            <DialogTitle className="text-xl sm:text-2xl font-semibold text-white text-center px-2">
               Saving your resume
             </DialogTitle>
-            <DialogDescription className="text-white/60 text-center">
+            <DialogDescription className="text-white/60 text-center text-xs sm:text-sm px-2">
               Please wait while we save your matches...
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-white"></div>
             </div>
           </div>
         </DialogContent>
@@ -722,11 +723,11 @@ export const Hero = () => {
       <Features />
 
       {/* Resume Upload Section */}
-      <section className="py-20 bg-gradient-to-br from-black via-gray-900 to-gray-800">
-        <div className="container mx-auto px-4">
+      <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-br from-black via-gray-900 to-gray-800">
+        <div className="container mx-auto px-4 sm:px-6 md:px-8">
           <div className="max-w-md mx-auto">
             <div id="resume-upload-section" className="animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-              <h2 className="text-white text-lg mb-4 text-center">Upload your resume here.</h2>
+              <h2 className="text-white text-base sm:text-lg mb-3 sm:mb-4 text-center px-2">Upload your resume here.</h2>
               <div className="relative">
                 <input
                   id="resume"
@@ -736,20 +737,20 @@ export const Hero = () => {
                   className="hidden"
                   ref={fileInputRef}
                 />
-                <div className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-lg p-3">
+                <div className="flex items-center gap-2 sm:gap-3 bg-white/10 border border-white/20 rounded-lg p-2 sm:p-3">
                   <label
                     htmlFor="resume"
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded cursor-pointer transition-colors text-sm font-medium"
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-700 hover:bg-gray-600 text-white rounded cursor-pointer transition-colors text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0"
                   >
                     Choose File
                   </label>
-                  <span className="text-white/60 text-sm flex-1">
+                  <span className="text-white/60 text-xs sm:text-sm flex-1 min-w-0 truncate">
                     {file ? file.name : "No file chosen"}
                   </span>
                   {file && (
                     <button
                       onClick={handleRemoveFile}
-                      className="text-white/60 hover:text-white transition-colors"
+                      className="text-white/60 hover:text-white transition-colors flex-shrink-0"
                       aria-label="Remove file"
                     >
                       <X className="h-4 w-4" />
@@ -759,7 +760,7 @@ export const Hero = () => {
                 <p className="text-white/60 text-xs mt-2 text-center">
                   .pdf and .docx only
                 </p>
-                <p className="text-white/70 text-sm mt-4 text-center font-medium">
+                <p className="text-white/70 text-xs sm:text-sm mt-3 sm:mt-4 text-center font-medium px-2">
                   One resume upload → Personalized outreach to dozens of startups
                 </p>
               </div>
