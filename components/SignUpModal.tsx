@@ -33,6 +33,9 @@ export const SignUpModal = ({ open, onOpenChange, fromReview = false, onSwitchTo
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            prompt: 'select_account', // Force account picker to show every time
+          },
         },
       });
 

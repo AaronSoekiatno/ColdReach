@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -11,13 +12,21 @@ const oauth2Client = new google.auth.OAuth2(
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  const state = searchParams.get('state'); // user email
+  const state = searchParams.get('state'); // Format: "email:token"
 
   if (!code || !state) {
     return NextResponse.redirect(new URL('/?error=gmail_connect_failed', request.url));
   }
 
   try {
+    // Parse state to get email and session token
+    const [userEmail, sessionToken] = state.split(':');
+    
+    if (!userEmail || !sessionToken) {
+      console.error('Invalid state format:', state);
+      return NextResponse.redirect(new URL('/?error=invalid_state', request.url));
+    }
+
     // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     
@@ -25,7 +34,7 @@ export async function GET(request: NextRequest) {
       throw new Error('No access token received');
     }
     
-    // Verify user is authenticated
+    // Verify user is authenticated using the session token from state
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -39,14 +48,34 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Use the session token to authenticate instead of relying on cookies
+    const { data: { user }, error: authError } = await supabase.auth.getUser(sessionToken);
     
-    if (authError || !user || user.email !== state) {
+    if (authError || !user || user.email !== userEmail) {
+      console.error('Authentication failed:', {
+        authError,
+        userEmail,
+        userEmailFromToken: user?.email,
+      });
       return NextResponse.redirect(new URL('/?error=unauthorized', request.url));
     }
 
+    // Store Gmail tokens in Supabase using service role key to bypass RLS
+    // We've already validated the user above, so this is safe
+    // The service role key bypasses RLS, which is necessary here since we can't set the session properly
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not set');
+      return NextResponse.redirect(new URL('/?error=server_config_error', request.url));
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey
+    );
+
     // Store Gmail tokens in Supabase
-    const { error: dbError } = await supabase
+    const { error: dbError } = await supabaseAdmin
       .from('user_email_connections')
       .upsert({
         user_email: user.email,

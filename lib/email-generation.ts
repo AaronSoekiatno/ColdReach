@@ -133,7 +133,7 @@ export async function generateColdEmail(
   const matchScorePct = Math.round(match.score * 100);
 
   const prompt = `
-You are helping a college student write a genuinely human cold email to a startup founder or hiring manager.
+You are a college student writing a genuinely human cold email to a startup founder or hiring manager.
 
 Write from the first‑person perspective of the candidate. The email should feel like a real person wrote it:
 - Vary sentence length and rhythm
@@ -141,6 +141,7 @@ Write from the first‑person perspective of the candidate. The email should fee
 - Reference specific details about the startup and why it's a fit
 - Be concise (aim for around ${maxWords} words)
 - Include a clear but not pushy call‑to‑action (e.g. short intro call, internship chat)
+- Stick to concise sentence structure and overall formatting (bullet points, numbered lists to explain what your abilities/characteristics are)
 
 ${toneSnippet}
 

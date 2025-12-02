@@ -11,6 +11,7 @@ import { Footer } from "@/components/Footer";
 import { HowItWorksJourney } from "@/components/HowItWorksJourney";
 import { SignInModal } from "@/components/SignInModal";
 import { SignUpModal } from "@/components/SignUpModal";
+import { ConnectGmailButton } from "@/components/ConnectGmailButton";
 import {
   Dialog,
   DialogContent,
@@ -129,10 +130,17 @@ export const Hero = () => {
   const [matchCount, setMatchCount] = useState<number>(0);
   const [pendingResumeData, setPendingResumeData] = useState<any>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [showGmailConnectModal, setShowGmailConnectModal] = useState(false);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [hasCheckedGmail, setHasCheckedGmail] = useState(false);
   const { toast } = useToast();
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const reuploadInProgress = useRef(false);
+  const checkingGmailRef = useRef(false);
+  const gmailCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const modalScheduledRef = useRef(false);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const { data, file: storedFile } = loadPendingResumeFromStorage();
@@ -213,29 +221,6 @@ export const Hero = () => {
   );
 
   useEffect(() => {
-    if (
-      user &&
-      pendingResumeData &&
-      !pendingResumeData.savedToDatabase &&
-      uploadedFile &&
-      !reuploadInProgress.current
-    ) {
-      setShowSavingModal(true);
-      reuploadPendingResume({ silent: true }).then((success) => {
-        if (success) {
-          // Small delay to ensure state is updated
-          setTimeout(() => {
-            setShowSavingModal(false);
-            router.push('/matches');
-          }, 500);
-        } else {
-          setShowSavingModal(false);
-        }
-      });
-    }
-  }, [user, pendingResumeData, uploadedFile, reuploadPendingResume, router]);
-
-  useEffect(() => {
     // Initialize current user on mount
     const initializeAuth = async () => {
       // Check if we're coming from an auth callback (magic link or OAuth)
@@ -257,8 +242,34 @@ export const Hero = () => {
       // Use session user if available, otherwise fall back to getUser
       setUser(session?.user ?? currentUser ?? null);
       
+      // Check for Gmail connection success
+      if (urlParams.get('gmail_connected') === 'true') {
+        setGmailConnected(true);
+        setShowGmailConnectModal(false);
+        modalScheduledRef.current = false;
+        if (gmailCheckTimeoutRef.current) {
+          clearTimeout(gmailCheckTimeoutRef.current);
+          gmailCheckTimeoutRef.current = null;
+        }
+        toast({
+          title: "Gmail connected!",
+          description: "You can now send emails directly from your account.",
+        });
+      }
+      
+      // Check if user needs to sign in to connect Gmail
+      if (urlParams.get('error') === 'please_sign_in' && urlParams.get('action') === 'connect_gmail') {
+        if (!currentUser) {
+          setIsSignInModalOpen(true);
+          toast({
+            title: "Please sign in",
+            description: "You need to sign in to connect your Gmail account.",
+          });
+        }
+      }
+      
       // Clean up URL if we came from auth callback
-      if (isAuthCallback) {
+      if (isAuthCallback || urlParams.has('gmail_connected') || urlParams.has('error')) {
         // Remove query params and hash
         window.history.replaceState({}, '', window.location.pathname);
       }
@@ -271,6 +282,15 @@ export const Hero = () => {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       const newUser = session?.user ?? null;
       setUser(newUser);
+
+      // If user just signed in, check Gmail connection status
+      if (event === 'SIGNED_IN' && newUser) {
+        // Reset check state so we check again, but only if not already checking
+        if (!checkingGmailRef.current && !showGmailConnectModal && !gmailConnected) {
+          setHasCheckedGmail(false);
+          // checkGmailConnection will be called by the useEffect
+        }
+      }
 
       // If user just signed in and we have pending resume data, save it
       if (
@@ -294,6 +314,19 @@ export const Hero = () => {
           }
         });
       }
+
+      // If user signed out, reset Gmail connection state
+      if (event === 'SIGNED_OUT') {
+        setGmailConnected(false);
+        setHasCheckedGmail(false);
+        setShowGmailConnectModal(false);
+        checkingGmailRef.current = false;
+        modalScheduledRef.current = false;
+        if (gmailCheckTimeoutRef.current) {
+          clearTimeout(gmailCheckTimeoutRef.current);
+          gmailCheckTimeoutRef.current = null;
+        }
+      }
     });
 
     return () => {
@@ -303,6 +336,141 @@ export const Hero = () => {
       }
     };
   }, [pendingResumeData, uploadedFile, toast, reuploadPendingResume, router]);
+
+  useEffect(() => {
+    if (
+      user &&
+      pendingResumeData &&
+      !pendingResumeData.savedToDatabase &&
+      uploadedFile &&
+      !reuploadInProgress.current
+    ) {
+      setShowSavingModal(true);
+      reuploadPendingResume({ silent: true }).then((success) => {
+        if (success) {
+          // Small delay to ensure state is updated
+          setTimeout(() => {
+            setShowSavingModal(false);
+            router.push('/matches');
+          }, 500);
+        } else {
+          setShowSavingModal(false);
+        }
+      });
+    }
+  }, [user, pendingResumeData, uploadedFile, reuploadPendingResume, router]);
+
+  // Check Gmail connection status
+  const checkGmailConnection = async () => {
+    if (!user) {
+      setHasCheckedGmail(false);
+      checkingGmailRef.current = false;
+      return;
+    }
+
+    // Prevent duplicate checks
+    if (checkingGmailRef.current) {
+      return;
+    }
+
+    // Don't check if modal is already showing or Gmail is already connected
+    if (showGmailConnectModal || gmailConnected) {
+      setHasCheckedGmail(true);
+      checkingGmailRef.current = false;
+      return;
+    }
+
+    checkingGmailRef.current = true;
+
+    // Clear any existing timeout and reset scheduled flag
+    if (gmailCheckTimeoutRef.current) {
+      clearTimeout(gmailCheckTimeoutRef.current);
+      gmailCheckTimeoutRef.current = null;
+    }
+    modalScheduledRef.current = false;
+
+    try {
+      const response = await fetch('/api/auth/gmail/status', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const connected = data.connected && !data.expired;
+        setGmailConnected(connected);
+        
+        // If not connected and we haven't scheduled the modal yet, schedule it
+        if (!connected && !modalScheduledRef.current) {
+          modalScheduledRef.current = true;
+          gmailCheckTimeoutRef.current = setTimeout(() => {
+            setShowGmailConnectModal((prev) => {
+              // Only show if not already showing
+              if (!prev) {
+                return true;
+              }
+              return prev;
+            });
+            gmailCheckTimeoutRef.current = null;
+            modalScheduledRef.current = false;
+          }, 1500);
+        }
+      } else {
+        setGmailConnected(false);
+        // Schedule modal if not already scheduled
+        if (!modalScheduledRef.current) {
+          modalScheduledRef.current = true;
+          gmailCheckTimeoutRef.current = setTimeout(() => {
+            setShowGmailConnectModal((prev) => {
+              if (!prev) {
+                return true;
+              }
+              return prev;
+            });
+            gmailCheckTimeoutRef.current = null;
+            modalScheduledRef.current = false;
+          }, 1500);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check Gmail connection:', error);
+      setGmailConnected(false);
+      // Schedule modal if not already scheduled
+      if (!modalScheduledRef.current) {
+        modalScheduledRef.current = true;
+        gmailCheckTimeoutRef.current = setTimeout(() => {
+          setShowGmailConnectModal((prev) => {
+            if (!prev) {
+              return true;
+            }
+            return prev;
+          });
+          gmailCheckTimeoutRef.current = null;
+          modalScheduledRef.current = false;
+        }, 1500);
+      }
+    } finally {
+      setHasCheckedGmail(true);
+      checkingGmailRef.current = false;
+    }
+  };
+
+  // Check Gmail connection when user is available
+  useEffect(() => {
+    // Only check if all conditions are met and we're not already checking
+    if (user && !hasCheckedGmail && !showGmailConnectModal && !gmailConnected && !checkingGmailRef.current) {
+      void checkGmailConnection();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, hasCheckedGmail]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (gmailCheckTimeoutRef.current) {
+        clearTimeout(gmailCheckTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const startProgressSimulation = () => {
     if (progressIntervalRef.current) {
@@ -510,6 +678,72 @@ export const Hero = () => {
         </div>
       </header>
 
+      {/* Gmail Connection Modal */}
+      <Dialog open={showGmailConnectModal} onOpenChange={(open) => {
+        setShowGmailConnectModal(open);
+        if (!open) {
+          // Reset scheduled flag when modal is closed
+          modalScheduledRef.current = false;
+          if (gmailCheckTimeoutRef.current) {
+            clearTimeout(gmailCheckTimeoutRef.current);
+            gmailCheckTimeoutRef.current = null;
+          }
+        }
+      }}>
+        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-semibold text-white text-center">
+              Connect Gmail to Send Emails
+            </DialogTitle>
+            <DialogDescription className="text-white/60 text-center">
+              Connect your Gmail account to send personalized emails to startup founders with one click.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="bg-gray-900/50 border border-white/10 rounded-lg p-4">
+              <p className="text-white/80 text-sm mb-2">
+                <strong className="text-white">Why connect Gmail?</strong>
+              </p>
+              <ul className="text-white/60 text-sm space-y-1 list-disc list-inside">
+                <li>Send emails directly from your Gmail account</li>
+                <li>No need to copy and paste generated emails</li>
+                <li>One-click email sending to matched startups</li>
+              </ul>
+            </div>
+            <ConnectGmailButton
+              onConnected={() => {
+                setGmailConnected(true);
+                setShowGmailConnectModal(false);
+                modalScheduledRef.current = false;
+                if (gmailCheckTimeoutRef.current) {
+                  clearTimeout(gmailCheckTimeoutRef.current);
+                  gmailCheckTimeoutRef.current = null;
+                }
+                toast({
+                  title: "Gmail connected!",
+                  description: "You can now send emails directly from your account.",
+                });
+              }}
+              className="w-full"
+            />
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowGmailConnectModal(false);
+                modalScheduledRef.current = false;
+                if (gmailCheckTimeoutRef.current) {
+                  clearTimeout(gmailCheckTimeoutRef.current);
+                  gmailCheckTimeoutRef.current = null;
+                }
+              }}
+              className="w-full text-white/60 hover:text-white hover:bg-gray-900"
+            >
+              Maybe later
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
 
         {/* Sign In Modal */}
@@ -542,10 +776,10 @@ export const Hero = () => {
           onSwitchToSignIn={() => setIsSignInModalOpen(true)}
         />
 
-        {/* Content */}
-        <div className="container relative z-10 px-4 py-20">
-          <div className="max-w-4xl mx-auto text-center space-y-12">
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+      {/* Content */}
+      <div className="container relative z-10 px-4 py-20">
+        <div className="max-w-4xl mx-auto text-center space-y-12">
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
               <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
                 Land Your Dream Internship
               </h1>
@@ -561,10 +795,10 @@ export const Hero = () => {
               >
                 Get Your Internship
               </Button>
-            </div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
       {/* Upload Progress Modal */}
       <Dialog open={showProgressModal} onOpenChange={() => {}}>
