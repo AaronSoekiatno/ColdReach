@@ -109,10 +109,23 @@ export default async function MatchesPage() {
         </div>
 
         {typedMatches.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {typedMatches.map((match) => (
-              <MatchCard key={match.id} match={match} />
-            ))}
+          <div className="relative">
+            {/* All matches blurred for waitlist */}
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 blur-md pointer-events-none select-none">
+              {typedMatches.map((match) => (
+                <MatchCard key={match.id} match={match} />
+              ))}
+            </div>
+
+            {/* Overlay message */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-black/80 backdrop-blur-sm border border-white/30 rounded-3xl px-8 py-6 text-center shadow-2xl">
+                <h3 className="text-2xl font-bold text-white mb-2">More Coming Soon</h3>
+                <p className="text-white/80 text-sm">
+                  We're creating personalized cold DMs for you
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl p-12 text-center text-white">
