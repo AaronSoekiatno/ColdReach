@@ -6,23 +6,23 @@ const steps = [
   {
     number: "1",
     icon: Target,
-    title: "We Match YOU with Perfect-Fit Startups",
+    title: "Match with Hot Startups",
     description:
-      "Our AI analyzes YOUR skills, education, and experience to find companies that directly align with YOUR background. No more wasting time on irrelevant applications.",
+      "We analyze your experiences to find companies that directly align. No more wasting time on long-shot applications.",
   },
   {
     number: "2",
     icon: Bot,
-    title: "We Craft Compelling Messages FOR YOU",
+    title: "Craft Compelling Messages",
     description:
-      "Each startup gets a unique, professional cold DM that highlights YOUR relevant experience and why YOU're a great fit. No generic templates—every message is tailored.",
+      "We create personalized cold DMs that highlight your relevant experience and why you're a great fit. No generic templates.",
   },
   {
     number: "3",
     icon: Zap,
-    title: "We Send Everything FOR YOU",
+    title: "Outreach Before Everyone",
     description:
-      "Connect your Gmail once, and we handle the rest. YOUR resume and personalized DMs reach founder inboxes automatically. What takes 40+ hours manually takes 5 minutes with ColdReach.",
+      "Connect your Gmail. Your resume and message will automatically reach founder inboxes. No more manual outreach.",
   },
 ];
 

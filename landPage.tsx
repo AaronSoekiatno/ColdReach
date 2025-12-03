@@ -133,6 +133,7 @@ export const Hero = () => {
   const [showGmailConnectModal, setShowGmailConnectModal] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [hasCheckedGmail, setHasCheckedGmail] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -572,24 +573,56 @@ export const Hero = () => {
     }
   };
 
+  const validateAndProcessFile = (selectedFile: File) => {
+    const isPdf = selectedFile.type === 'application/pdf' || selectedFile.name.endsWith('.pdf');
+    const isDocx = selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                   selectedFile.name.endsWith('.docx');
+    
+    if (isPdf || isDocx) {
+      // Allow uploads without sign-in
+      setFile(selectedFile);
+      void uploadResume(selectedFile);
+    } else {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF or DOCX file",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      const isPdf = selectedFile.type === 'application/pdf' || selectedFile.name.endsWith('.pdf');
-      const isDocx = selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
-                     selectedFile.name.endsWith('.docx');
-      
-      if (isPdf || isDocx) {
-        // Allow uploads without sign-in
-        setFile(selectedFile);
-        void uploadResume(selectedFile);
-      } else {
-        toast({
-          title: "Invalid file type",
-          description: "Please upload a PDF or DOCX file",
-          variant: "destructive",
-        });
-      }
+      validateAndProcessFile(selectedFile);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) {
+      validateAndProcessFile(droppedFile);
     }
   };
 
@@ -644,8 +677,22 @@ export const Hero = () => {
                     <div className="px-4 py-2 text-sm text-white/80 border-b border-white/10">
                       {user.email}
                     </div>
+                    {gmailConnected ? (
+                      <div className="px-4 py-2 text-sm text-white/60 border-b border-white/10 flex items-center justify-center gap-2">
+                        <span className="text-green-500">✓</span> Gmail Connected
+                      </div>
+                    ) : (
+                      <DropdownMenuItem
+                        className="cursor-pointer text-white w-full px-4 py-2 text-center hover:bg-white/20 focus:bg-white/20 border-0"
+                        onSelect={() => {
+                          setShowGmailConnectModal(true);
+                        }}
+                      >
+                        Connect Gmail
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
-                      className="cursor-pointer text-white w-full px-4 py-2 text-center hover:bg-white/20 focus:bg-white/20"
+                      className="cursor-pointer text-white w-full px-4 py-2 text-center hover:bg-white/20 focus:bg-white/20 border-0"
                       onSelect={async () => {
                         await supabase.auth.signOut();
                         setUser(null);
@@ -695,10 +742,10 @@ export const Hero = () => {
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl font-semibold text-white text-center">
-              Connect Gmail to Send Emails
+              Connect Your Gmail Account
             </DialogTitle>
             <DialogDescription className="text-white/60 text-center">
-              Connect your Gmail account to send personalized emails to startup founders with one click.
+              Send personalized emails to startup founders with a single click.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
@@ -726,10 +773,9 @@ export const Hero = () => {
                   description: "You can now send emails directly from your account.",
                 });
               }}
-              className="w-full"
+              className="w-full border-0 hover:bg-white/10"
             />
             <Button
-              variant="ghost"
               onClick={() => {
                 setShowGmailConnectModal(false);
                 modalScheduledRef.current = false;
@@ -738,7 +784,7 @@ export const Hero = () => {
                   gmailCheckTimeoutRef.current = null;
                 }
               }}
-              className="w-full text-white/60 hover:text-white hover:bg-gray-900"
+              className="w-full border-0 hover:bg-white/10"
             >
               Maybe later
             </Button>
@@ -984,7 +1030,6 @@ export const Hero = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-md mx-auto">
             <div id="resume-upload-section" className="animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-              <h2 className="text-white text-lg mb-4 text-center">Upload your resume here.</h2>
               <div className="relative">
                 <input
                   id="resume"
@@ -994,29 +1039,51 @@ export const Hero = () => {
                   className="hidden"
                   ref={fileInputRef}
                 />
-                <div className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-lg p-3">
-                  <label
-                    htmlFor="resume"
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded cursor-pointer transition-colors text-sm font-medium"
-                  >
-                    Choose File
-                  </label>
-                  <span className="text-white/60 text-sm flex-1">
-                    {file ? file.name : "No file chosen"}
-                  </span>
-                  {file && (
-                    <button
-                      onClick={handleRemoveFile}
-                      className="text-white/60 hover:text-white transition-colors"
-                      aria-label="Remove file"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                <div
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex flex-col items-center justify-center gap-3 bg-white/10 border-2 border-dashed rounded-lg p-8 cursor-pointer transition-all ${
+                    isDragging 
+                      ? 'border-blue-500 bg-blue-500/20 scale-105' 
+                      : 'border-white/20 hover:border-white/40 hover:bg-white/15'
+                  }`}
+                >
+                  {file ? (
+                    <>
+                      <div className="flex items-center gap-3 w-full">
+                        <FileText className="h-8 w-8 text-white/60" />
+                        <span className="text-white text-sm flex-1 truncate">
+                          {file.name}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveFile(e);
+                          }}
+                          className="text-white/60 hover:text-white transition-colors flex-shrink-0"
+                          aria-label="Remove file"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-12 w-12 text-white/60" />
+                      <div className="text-center">
+                        <p className="text-white text-sm font-medium mb-1">
+                          {isDragging ? 'Drop your resume here' : 'Upload your resume here'}
+                        </p>
+                        <p className="text-white/60 text-xs">
+                          PDF or DOCX files only
+                        </p>
+                      </div>
+                    </>
                   )}
                 </div>
-                <p className="text-white/60 text-xs mt-2 text-center">
-                  .pdf and .docx only
-                </p>
                 <p className="text-white/70 text-sm mt-4 text-center font-medium">
                   One resume upload → Personalized outreach to dozens of startups
                 </p>
