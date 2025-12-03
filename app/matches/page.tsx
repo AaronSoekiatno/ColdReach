@@ -96,7 +96,7 @@ export default async function MatchesPage() {
 
   // Feature flag: when true, keep the blurred "coming soon" overlay;
   // when false, show the real, interactive matches with SendEmailButton.
-  const showWaitlistOverlay = false;
+  const showWaitlistOverlay = true;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 dark:from-zinc-900 dark:via-zinc-950 dark:to-black">
@@ -107,7 +107,7 @@ export default async function MatchesPage() {
           <h1 className="text-4xl md:text-5xl font-bold text-blue-300">Startups excited to meet you</h1>
           <p className="text-white/90 text-lg">
             {hasMatches
-              ? `Congrats you matched with ${typedMatches.length} startup${
+              ? `Congrats! You matched with ${typedMatches.length} startup${
                   typedMatches.length === 1 ? '' : 's'
                 }! Review your matches and send personalized emails.`
               : 'Upload a resume to see personalized startup matches.'}
@@ -127,10 +127,7 @@ export default async function MatchesPage() {
               {/* Overlay message */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="bg-black/80 backdrop-blur-sm border border-white/30 rounded-3xl px-8 py-6 text-center shadow-2xl">
-                  <h3 className="text-2xl font-bold text-white mb-2">More Coming Soon</h3>
-                  <p className="text-white/80 text-sm">
-                    We're creating personalized cold DMs for you
-                  </p>
+                  <h3 className="text-2xl font-bold text-white mb-2">Thanks for joining the waitlist! More coming soon shortly</h3>
                 </div>
               </div>
             </div>

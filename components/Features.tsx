@@ -7,12 +7,12 @@ const features = [
   {
     icon: Target,
     title: "Only Startups That Want YOU",
-    description: "We only show matches above 45% similarity. No spam, no wasted effort—just companies excited about YOUR profile."
+    description: "We only show matches above 45% similarity. No spam, no wasted effort—just companies excited about your profile."
   },
   {
     icon: Sparkles,
     title: "Cold DMs That Actually Get Replies",
-    description: "Our AI researches each startup and crafts genuine conversation starters, expresses interest with specific details, and highlights why YOU're the perfect fit."
+    description: "Our AI researches each startup and crafts genuine conversation starters, expresses interest with specific details, and highlights why you're the perfect fit."
   },
   {
     icon: Zap,

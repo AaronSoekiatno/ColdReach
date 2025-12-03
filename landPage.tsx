@@ -286,20 +286,21 @@ export const Hero = () => {
       setUser(newUser);
 
       // If user just signed in, check Gmail connection status
-      if (event === 'SIGNED_IN' && newUser) {
-        // Only check Gmail connection as part of the sign-in / sign-up flow.
-        // Avoid duplicate checks for the same user/email.
-        if (
-          newUser.email &&
-          newUser.email !== lastCheckedUserRef.current &&
-          !checkingGmailRef.current &&
-          !showGmailConnectModal &&
-          !gmailConnected
-        ) {
-          lastCheckedUserRef.current = newUser.email;
-          void checkGmailConnection(newUser);
-        }
-      }
+      // DISABLED: Gmail connect functionality temporarily hidden
+      // if (event === 'SIGNED_IN' && newUser) {
+      //   // Only check Gmail connection as part of the sign-in / sign-up flow.
+      //   // Avoid duplicate checks for the same user/email.
+      //   if (
+      //     newUser.email &&
+      //     newUser.email !== lastCheckedUserRef.current &&
+      //     !checkingGmailRef.current &&
+      //     !showGmailConnectModal &&
+      //     !gmailConnected
+      //   ) {
+      //     lastCheckedUserRef.current = newUser.email;
+      //     void checkGmailConnection(newUser);
+      //   }
+      // }
 
       // If user just signed in and we have pending resume data, save it
       if (
@@ -371,105 +372,109 @@ export const Hero = () => {
   }, [user, pendingResumeData, uploadedFile, reuploadPendingResume, router]);
 
   // Check Gmail connection status
+  // DISABLED: Gmail connect functionality temporarily hidden
   const checkGmailConnection = async (currentUser?: User | null) => {
-    const activeUser = currentUser ?? user;
+    // Function disabled - Gmail connect functionality temporarily hidden
+    return;
+    
+    // const activeUser = currentUser ?? user;
 
-    if (!activeUser) {
-      setHasCheckedGmail(false);
-      checkingGmailRef.current = false;
-      return;
-    }
+    // if (!activeUser) {
+    //   setHasCheckedGmail(false);
+    //   checkingGmailRef.current = false;
+    //   return;
+    // }
 
-    // Prevent duplicate checks
-    if (checkingGmailRef.current) {
-      return;
-    }
+    // // Prevent duplicate checks
+    // if (checkingGmailRef.current) {
+    //   return;
+    // }
 
-    // Don't check if modal is already showing or Gmail is already connected
-    if (showGmailConnectModal || gmailConnected) {
-      setHasCheckedGmail(true);
-      checkingGmailRef.current = false;
-      return;
-    }
+    // // Don't check if modal is already showing or Gmail is already connected
+    // if (showGmailConnectModal || gmailConnected) {
+    //   setHasCheckedGmail(true);
+    //   checkingGmailRef.current = false;
+    //   return;
+    // }
 
-    checkingGmailRef.current = true;
+    // checkingGmailRef.current = true;
 
-    // Clear any existing timeout and reset scheduled flag
-    if (gmailCheckTimeoutRef.current) {
-      clearTimeout(gmailCheckTimeoutRef.current);
-      gmailCheckTimeoutRef.current = null;
-    }
-    modalScheduledRef.current = false;
+    // // Clear any existing timeout and reset scheduled flag
+    // if (gmailCheckTimeoutRef.current) {
+    //   clearTimeout(gmailCheckTimeoutRef.current);
+    //   gmailCheckTimeoutRef.current = null;
+    // }
+    // modalScheduledRef.current = false;
 
-    try {
-      const response = await fetch('/api/auth/gmail/status', {
-        credentials: 'include',
-      });
+    // try {
+    //   const response = await fetch('/api/auth/gmail/status', {
+    //     credentials: 'include',
+    //   });
 
-      console.log('[Gmail Status][client] Response status:', response.status);
+    //   console.log('[Gmail Status][client] Response status:', response.status);
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[Gmail Status][client] Response JSON:', data);
+    //   if (response.ok) {
+    //     const data = await response.json();
+    //     console.log('[Gmail Status][client] Response JSON:', data);
 
-        // Treat any existing connection as "connected" even if the access token is expired.
-        // Expiration is handled server-side by refreshing the token when sending emails.
-        const connected = data.connected === true;
-        setGmailConnected(connected);
+    //     // Treat any existing connection as "connected" even if the access token is expired.
+    //     // Expiration is handled server-side by refreshing the token when sending emails.
+    //     const connected = data.connected === true;
+    //     setGmailConnected(connected);
 
-        // Only prompt to connect if there is truly no connection row
-        if (!connected && !modalScheduledRef.current) {
-          modalScheduledRef.current = true;
-          gmailCheckTimeoutRef.current = setTimeout(() => {
-            setShowGmailConnectModal((prev) => {
-              // Only show if not already showing
-              if (!prev) {
-                return true;
-              }
-              return prev;
-            });
-            gmailCheckTimeoutRef.current = null;
-            modalScheduledRef.current = false;
-          }, 1500);
-        }
-      } else {
-        setGmailConnected(false);
-        // Schedule modal if not already scheduled
-        if (!modalScheduledRef.current) {
-          modalScheduledRef.current = true;
-          gmailCheckTimeoutRef.current = setTimeout(() => {
-            setShowGmailConnectModal((prev) => {
-              if (!prev) {
-                return true;
-              }
-              return prev;
-            });
-            gmailCheckTimeoutRef.current = null;
-            modalScheduledRef.current = false;
-          }, 1500);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to check Gmail connection:', error);
-      setGmailConnected(false);
-      // Schedule modal if not already scheduled
-      if (!modalScheduledRef.current) {
-        modalScheduledRef.current = true;
-        gmailCheckTimeoutRef.current = setTimeout(() => {
-          setShowGmailConnectModal((prev) => {
-            if (!prev) {
-              return true;
-            }
-            return prev;
-          });
-          gmailCheckTimeoutRef.current = null;
-          modalScheduledRef.current = false;
-        }, 1500);
-      }
-    } finally {
-      setHasCheckedGmail(true);
-      checkingGmailRef.current = false;
-    }
+    //     // Only prompt to connect if there is truly no connection row
+    //     if (!connected && !modalScheduledRef.current) {
+    //       modalScheduledRef.current = true;
+    //       gmailCheckTimeoutRef.current = setTimeout(() => {
+    //         setShowGmailConnectModal((prev) => {
+    //           // Only show if not already showing
+    //           if (!prev) {
+    //             return true;
+    //           }
+    //           return prev;
+    //         });
+    //         gmailCheckTimeoutRef.current = null;
+    //         modalScheduledRef.current = false;
+    //       }, 1500);
+    //     }
+    //   } else {
+    //     setGmailConnected(false);
+    //     // Schedule modal if not already scheduled
+    //     if (!modalScheduledRef.current) {
+    //       modalScheduledRef.current = true;
+    //       gmailCheckTimeoutRef.current = setTimeout(() => {
+    //         setShowGmailConnectModal((prev) => {
+    //           if (!prev) {
+    //             return true;
+    //           }
+    //           return prev;
+    //         });
+    //         gmailCheckTimeoutRef.current = null;
+    //         modalScheduledRef.current = false;
+    //       }, 1500);
+    //     }
+    //   }
+    // } catch (error) {
+    //   console.error('Failed to check Gmail connection:', error);
+    //   setGmailConnected(false);
+    //   // Schedule modal if not already scheduled
+    //   if (!modalScheduledRef.current) {
+    //     modalScheduledRef.current = true;
+    //     gmailCheckTimeoutRef.current = setTimeout(() => {
+    //       setShowGmailConnectModal((prev) => {
+    //         if (!prev) {
+    //           return true;
+    //         }
+    //         return prev;
+    //       });
+    //       gmailCheckTimeoutRef.current = null;
+    //       modalScheduledRef.current = false;
+    //     }
+    //   }
+    // } finally {
+    //   setHasCheckedGmail(true);
+    //   checkingGmailRef.current = false;
+    // }
   };
 
   // Cleanup timeout on unmount
@@ -683,7 +688,8 @@ export const Hero = () => {
                     <div className="px-4 py-2 text-sm text-white/80 border-b border-white/10">
                       {user.email}
                     </div>
-                    {gmailConnected ? (
+                    {/* Gmail connect functionality temporarily hidden */}
+                    {/* {gmailConnected ? (
                       <div className="px-4 py-2 text-sm text-white/60 border-b border-white/10 flex items-center justify-center gap-2">
                         <span className="text-green-500">✓</span> Gmail Connected
                       </div>
@@ -696,7 +702,7 @@ export const Hero = () => {
                       >
                         Connect Gmail
                       </DropdownMenuItem>
-                    )}
+                    )} */}
                     <DropdownMenuItem
                       className="cursor-pointer text-white w-full px-4 py-2 text-center hover:bg-white/20 focus:bg-white/20 border-0"
                       onSelect={async () => {
@@ -765,35 +771,42 @@ export const Hero = () => {
                 <li>One-click email sending to matched startups</li>
               </ul>
             </div>
-            <ConnectGmailButton
-              onConnected={() => {
-                setGmailConnected(true);
-                setShowGmailConnectModal(false);
-                modalScheduledRef.current = false;
-                if (gmailCheckTimeoutRef.current) {
-                  clearTimeout(gmailCheckTimeoutRef.current);
-                  gmailCheckTimeoutRef.current = null;
-                }
-                toast({
-                  title: "Gmail connected!",
-                  description: "You can now send emails directly from your account.",
-                });
-              }}
-              className="w-full border-0 hover:bg-white/10"
-            />
-            <Button
-              onClick={() => {
-                setShowGmailConnectModal(false);
-                modalScheduledRef.current = false;
-                if (gmailCheckTimeoutRef.current) {
-                  clearTimeout(gmailCheckTimeoutRef.current);
-                  gmailCheckTimeoutRef.current = null;
-                }
-              }}
-              className="w-full border-0 hover:bg-white/10"
-            >
-              Maybe later
-            </Button>
+            <div className="[&_button]:!border-0 [&_button]:border-transparent">
+              <ConnectGmailButton
+                variant="ghost"
+                onConnected={() => {
+                  setGmailConnected(true);
+                  setShowGmailConnectModal(false);
+                  modalScheduledRef.current = false;
+                  if (gmailCheckTimeoutRef.current) {
+                    clearTimeout(gmailCheckTimeoutRef.current);
+                    gmailCheckTimeoutRef.current = null;
+                  }
+                  toast({
+                    title: "Gmail connected!",
+                    description: "You can now send emails directly from your account.",
+                  });
+                }}
+                className="w-full !border-0 !border-transparent outline-none ring-0 focus:ring-0 focus-visible:ring-0 hover:bg-white/10"
+              />
+            </div>
+            <div className="[&_button]:!border-0 [&_button]:border-transparent">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowGmailConnectModal(false);
+                  modalScheduledRef.current = false;
+                  if (gmailCheckTimeoutRef.current) {
+                    clearTimeout(gmailCheckTimeoutRef.current);
+                    gmailCheckTimeoutRef.current = null;
+                  }
+                }}
+                className="w-full !border-0 !border-transparent outline-none ring-0 focus:ring-0 focus-visible:ring-0 hover:bg-white/10"
+                style={{ border: 'none', borderWidth: 0, borderColor: 'transparent', boxShadow: 'none', outline: 'none' }}
+              >
+                Maybe later
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -859,7 +872,7 @@ export const Hero = () => {
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl font-semibold text-white text-center">
-              Creating YOUR Matches
+              Creating Your Matches
             </DialogTitle>
             <DialogDescription className="text-white/60 text-center">
               Hang tight while we work our magic
@@ -873,7 +886,7 @@ export const Hero = () => {
                   {uploadProgress > 10 ? '✓' : '1'}
                 </div>
                 <span className={`text-sm ${uploadProgress > 10 ? 'text-white' : 'text-white/60'}`}>
-                  Analyzing YOUR resume...
+                  Analyzing your resume...
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -897,7 +910,7 @@ export const Hero = () => {
                   {uploadProgress >= 100 ? '✓' : '4'}
                 </div>
                 <span className={`text-sm ${uploadProgress >= 100 ? 'text-white' : 'text-white/60'}`}>
-                  Ready to review YOUR matches!
+                  Ready to review your matches!
                 </span>
               </div>
             </div>
@@ -921,10 +934,10 @@ export const Hero = () => {
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md text-center space-y-6">
           <DialogHeader>
             <DialogTitle className="text-3xl font-semibold text-white">
-              YOUR Matches Are Ready!
+              Your Matches Are Ready!
             </DialogTitle>
             <DialogDescription className="text-lg text-white">
-              We found {matchCount} startup{matchCount !== 1 ? 's' : ''} that align{matchCount === 1 ? 's' : ''} with YOUR background and crafted personalized messages for each one.
+              Congrats! We found {matchCount} startup{matchCount !== 1 ? 's' : ''} for you and have crafted personalized messages for each of them.
             </DialogDescription>
           </DialogHeader>
 
@@ -940,13 +953,11 @@ export const Hero = () => {
             </div>
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-xs">→</div>
-              <span className="text-sm text-white/80">Just connect Gmail to automate outreach</span>
+              <span className="text-sm text-white/80">Connect Gmail to automate outreach</span>
             </div>
           </div>
 
-          <div className="text-white/70 text-sm">
-            Review YOUR personalized matches and send emails with one click.
-          </div>
+          
           <Button
             className="w-full bg-white text-black hover:bg-white/90"
             onClick={async () => {
@@ -998,7 +1009,7 @@ export const Hero = () => {
               }
             }}
           >
-            Review YOUR Matches
+            Review Your Matches
           </Button>
         </DialogContent>
       </Dialog>

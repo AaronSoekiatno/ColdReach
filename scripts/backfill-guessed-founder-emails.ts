@@ -33,7 +33,7 @@ async function main() {
   console.log('Fetching startups with empty founder_emails...');
 
   const { data, error } = await supabase
-    .from<StartupRow>('startups')
+    .from('startups')
     .select('id, name, website, founder_first_name, founder_emails');
 
   if (error) {
@@ -41,7 +41,7 @@ async function main() {
     process.exit(1);
   }
 
-  const startups = (data ?? []).filter(
+  const startups = ((data ?? []) as StartupRow[]).filter(
     (s) => !s.founder_emails || s.founder_emails.trim() === ''
   );
 
