@@ -138,6 +138,7 @@ export const Hero = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const reuploadInProgress = useRef(false);
   const checkingGmailRef = useRef(false);
+  const lastCheckedUserRef = useRef<string | null>(null);
   const gmailCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const modalScheduledRef = useRef(false);
 
@@ -285,10 +286,17 @@ export const Hero = () => {
 
       // If user just signed in, check Gmail connection status
       if (event === 'SIGNED_IN' && newUser) {
-        // Reset check state so we check again, but only if not already checking
-        if (!checkingGmailRef.current && !showGmailConnectModal && !gmailConnected) {
-          setHasCheckedGmail(false);
-          // checkGmailConnection will be called by the useEffect
+        // Only check Gmail connection as part of the sign-in / sign-up flow.
+        // Avoid duplicate checks for the same user/email.
+        if (
+          newUser.email &&
+          newUser.email !== lastCheckedUserRef.current &&
+          !checkingGmailRef.current &&
+          !showGmailConnectModal &&
+          !gmailConnected
+        ) {
+          lastCheckedUserRef.current = newUser.email;
+          void checkGmailConnection(newUser);
         }
       }
 
@@ -321,6 +329,7 @@ export const Hero = () => {
         setHasCheckedGmail(false);
         setShowGmailConnectModal(false);
         checkingGmailRef.current = false;
+        lastCheckedUserRef.current = null;
         modalScheduledRef.current = false;
         if (gmailCheckTimeoutRef.current) {
           clearTimeout(gmailCheckTimeoutRef.current);
@@ -361,8 +370,10 @@ export const Hero = () => {
   }, [user, pendingResumeData, uploadedFile, reuploadPendingResume, router]);
 
   // Check Gmail connection status
-  const checkGmailConnection = async () => {
-    if (!user) {
+  const checkGmailConnection = async (currentUser?: User | null) => {
+    const activeUser = currentUser ?? user;
+
+    if (!activeUser) {
       setHasCheckedGmail(false);
       checkingGmailRef.current = false;
       return;
@@ -394,12 +405,18 @@ export const Hero = () => {
         credentials: 'include',
       });
 
+      console.log('[Gmail Status][client] Response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
-        const connected = data.connected && !data.expired;
+        console.log('[Gmail Status][client] Response JSON:', data);
+
+        // Treat any existing connection as "connected" even if the access token is expired.
+        // Expiration is handled server-side by refreshing the token when sending emails.
+        const connected = data.connected === true;
         setGmailConnected(connected);
-        
-        // If not connected and we haven't scheduled the modal yet, schedule it
+
+        // Only prompt to connect if there is truly no connection row
         if (!connected && !modalScheduledRef.current) {
           modalScheduledRef.current = true;
           gmailCheckTimeoutRef.current = setTimeout(() => {
@@ -453,15 +470,6 @@ export const Hero = () => {
       checkingGmailRef.current = false;
     }
   };
-
-  // Check Gmail connection when user is available
-  useEffect(() => {
-    // Only check if all conditions are met and we're not already checking
-    if (user && !hasCheckedGmail && !showGmailConnectModal && !gmailConnected && !checkingGmailRef.current) {
-      void checkGmailConnection();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, hasCheckedGmail]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

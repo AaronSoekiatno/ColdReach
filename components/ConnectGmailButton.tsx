@@ -37,7 +37,9 @@ export const ConnectGmailButton = ({
 
         if (response.ok) {
           const data = await response.json();
-          setIsConnected(data.connected && !data.expired);
+          // Consider any existing connection as "connected" even if the access token is expired.
+          // Expired access tokens will be refreshed server-side when sending emails.
+          setIsConnected(data.connected === true);
         }
       } catch (error) {
         console.error('Failed to check Gmail connection:', error);

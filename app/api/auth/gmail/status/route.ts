@@ -3,6 +3,8 @@ import { createServerClient } from '@supabase/ssr';
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('[Gmail Status] Incoming request cookies:', request.cookies.getAll());
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -17,6 +19,11 @@ export async function GET(request: NextRequest) {
     );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log('[Gmail Status] Auth result:', {
+      authError,
+      userEmail: user?.email,
+      userId: user?.id,
+    });
     
     if (authError || !user || !user.email) {
       return NextResponse.json(
@@ -33,6 +40,12 @@ export async function GET(request: NextRequest) {
       .eq('provider', 'gmail')
       .single();
 
+    console.log('[Gmail Status] Connection lookup:', {
+      connectionError,
+      emailConnection,
+      lookedUpEmail: user.email,
+    });
+
     if (connectionError || !emailConnection) {
       return NextResponse.json({ connected: false });
     }
@@ -41,6 +54,11 @@ export async function GET(request: NextRequest) {
     const isExpired = emailConnection.expires_at 
       ? new Date(emailConnection.expires_at) < new Date()
       : false;
+
+    console.log('[Gmail Status] Final status:', {
+      connected: true,
+      expired: isExpired,
+    });
 
     return NextResponse.json({
       connected: true,
