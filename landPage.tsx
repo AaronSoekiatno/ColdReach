@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText, X } from "lucide-react";
+// ARCHIVED: File upload icons - uncomment when restoring resume upload functionality
+// import { Upload, FileText, X } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Features } from "@/components/Features";
@@ -12,6 +13,7 @@ import { HowItWorksJourney } from "@/components/HowItWorksJourney";
 import { SignInModal } from "@/components/SignInModal";
 import { SignUpModal } from "@/components/SignUpModal";
 import { ConnectGmailButton } from "@/components/ConnectGmailButton";
+import { WaitlistModal } from "@/components/WaitlistModal";
 import {
   Dialog,
   DialogContent,
@@ -117,109 +119,118 @@ const SAMPLE_MATCHED_STARTUPS = [
 
 export const Hero = () => {
   const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  // ARCHIVED: Resume upload state - stored in _archived/resume-upload-functionality.tsx
+  // Uncomment these when restoring resume upload functionality:
+  // const [file, setFile] = useState<File | null>(null);
+  // const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  // const [showProgressModal, setShowProgressModal] = useState(false);
+  // const [showResultsModal, setShowResultsModal] = useState(false);
+  // const [showSavingModal, setShowSavingModal] = useState(false);
+  // const [isUploading, setIsUploading] = useState(false);
+  // const [uploadProgress, setUploadProgress] = useState(0);
+  // const [matchedStartups, setMatchedStartups] = useState<string[]>([]);
+  // const [matchCount, setMatchCount] = useState<number>(0);
+  // const [pendingResumeData, setPendingResumeData] = useState<any>(null);
+  // const [isDragging, setIsDragging] = useState(false);
+  // const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // const reuploadInProgress = useRef(false);
+  
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
-  const [showProgressModal, setShowProgressModal] = useState(false);
-  const [showResultsModal, setShowResultsModal] = useState(false);
-  const [showSavingModal, setShowSavingModal] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [matchedStartups, setMatchedStartups] = useState<string[]>([]);
-  const [matchCount, setMatchCount] = useState<number>(0);
-  const [pendingResumeData, setPendingResumeData] = useState<any>(null);
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [showGmailConnectModal, setShowGmailConnectModal] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [hasCheckedGmail, setHasCheckedGmail] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const reuploadInProgress = useRef(false);
   const checkingGmailRef = useRef(false);
   const gmailCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const modalScheduledRef = useRef(false);
+  const lastCheckedUserRef = useRef<string | null>(null); // Track which user email was last checked
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const { data, file: storedFile } = loadPendingResumeFromStorage();
-    if (data) {
-      setPendingResumeData(data);
-    }
-    if (storedFile) {
-      dataUrlToFile(storedFile.dataUrl, storedFile.name, storedFile.type)
-        .then((restoredFile) => {
-          setUploadedFile(restoredFile);
-          setFile(restoredFile);
-        })
-        .catch((error) => {
-          console.error("Failed to restore pending resume file", error);
-          clearPendingResumeStorage();
-        });
-    }
-  }, []);
+  // ARCHIVED: Resume upload restoration logic - stored in _archived/resume-upload-functionality.tsx
+  // Uncomment when restoring resume upload functionality:
+  // useEffect(() => {
+  //   if (typeof window === "undefined") return;
+  //   const { data, file: storedFile } = loadPendingResumeFromStorage();
+  //   if (data) {
+  //     setPendingResumeData(data);
+  //   }
+  //   if (storedFile) {
+  //     dataUrlToFile(storedFile.dataUrl, storedFile.name, storedFile.type)
+  //       .then((restoredFile) => {
+  //         setUploadedFile(restoredFile);
+  //         setFile(restoredFile);
+  //       })
+  //       .catch((error) => {
+  //         console.error("Failed to restore pending resume file", error);
+  //         clearPendingResumeStorage();
+  //       });
+  //   }
+  // }, []);
 
-  const reuploadPendingResume = useCallback(
-    async (options?: { silent?: boolean }) => {
-      if (!uploadedFile || reuploadInProgress.current) {
-        return false;
-      }
-      reuploadInProgress.current = true;
-      try {
-        const formData = new FormData();
-        formData.append("resume", uploadedFile);
-        const saveResponse = await fetch("/api/upload-resume", {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
+  // ARCHIVED: Resume reupload functionality - stored in _archived/resume-upload-functionality.tsx
+  // Uncomment when restoring resume upload functionality:
+  // const reuploadPendingResume = useCallback(
+  //   async (options?: { silent?: boolean }) => {
+  //     if (!uploadedFile || reuploadInProgress.current) {
+  //       return false;
+  //     }
+  //     reuploadInProgress.current = true;
+  //     try {
+  //       const formData = new FormData();
+  //       formData.append("resume", uploadedFile);
+  //       const saveResponse = await fetch("/api/upload-resume", {
+  //         method: "POST",
+  //         body: formData,
+  //         credentials: "include",
+  //       });
 
-        if (!saveResponse.ok) {
-          const errorData = await saveResponse.json().catch(() => null);
-          throw new Error(errorData?.error || "Failed to save resume");
-        }
+  //       if (!saveResponse.ok) {
+  //         const errorData = await saveResponse.json().catch(() => null);
+  //         throw new Error(errorData?.error || "Failed to save resume");
+  //       }
 
-        const data = await saveResponse.json();
-        const matches = data.matches || [];
-        setPendingResumeData({
-          ...data,
-          savedToDatabase: data.savedToDatabase ?? true,
-        });
-        setMatchCount(matches.length);
-        if (!options?.silent) {
-          setShowResultsModal(true);
-        }
+  //       const data = await saveResponse.json();
+  //       const matches = data.matches || [];
+  //       setPendingResumeData({
+  //         ...data,
+  //         savedToDatabase: data.savedToDatabase ?? true,
+  //       });
+  //       setMatchCount(matches.length);
+  //       if (!options?.silent) {
+  //         setShowResultsModal(true);
+  //       }
 
-        clearPendingResumeStorage();
-        setUploadedFile(null);
-        setFile(null);
+  //       clearPendingResumeStorage();
+  //       setUploadedFile(null);
+  //       setFile(null);
 
-        if (!options?.silent) {
-          toast({
-            title: "Resume saved",
-            description: "Your matches are ready to view.",
-          });
-        }
+  //       if (!options?.silent) {
+  //         toast({
+  //           title: "Resume saved",
+  //           description: "Your matches are ready to view.",
+  //         });
+  //       }
 
-        return true;
-      } catch (error) {
-        console.error("Failed to save resume", error);
-        if (!options?.silent) {
-          toast({
-            title: "Error",
-            description: "Failed to save your resume. Please try uploading again.",
-            variant: "destructive",
-          });
-        }
-        return false;
-      } finally {
-        reuploadInProgress.current = false;
-      }
-    },
-    [uploadedFile, toast]
-  );
+  //       return true;
+  //     } catch (error) {
+  //       console.error("Failed to save resume", error);
+  //       if (!options?.silent) {
+  //         toast({
+  //           title: "Error",
+  //           description: "Failed to save your resume. Please try uploading again.",
+  //           variant: "destructive",
+  //         });
+  //       }
+  //       return false;
+  //     } finally {
+  //       reuploadInProgress.current = false;
+  //     }
+  //   },
+  //   [uploadedFile, toast]
+  // );
 
   useEffect(() => {
     // Initialize current user on mount
@@ -301,28 +312,39 @@ export const Hero = () => {
       //   }
       // }
 
-      // If user just signed in and we have pending resume data, save it
-      if (
-        event === 'SIGNED_IN' &&
-        newUser &&
-        pendingResumeData &&
-        !pendingResumeData.savedToDatabase &&
-        uploadedFile &&
-        !reuploadInProgress.current
-      ) {
-        setShowSavingModal(true);
-        reuploadPendingResume({ silent: true }).then((success) => {
-          if (success) {
-            // Navigate to matches page after successful save
-            setTimeout(() => {
-              setShowSavingModal(false);
-              router.push('/matches');
-            }, 500);
-          } else {
-            setShowSavingModal(false);
-          }
-        });
+      // Reset Gmail check state only when user actually changes (different email)
+      if (event === 'SIGNED_IN' && newUser) {
+        if (newUser.email && newUser.email !== lastCheckedUserRef.current) {
+          // User changed - reset check state for new user
+          setHasCheckedGmail(false);
+          lastCheckedUserRef.current = newUser.email;
+        }
+        // If same user, keep hasCheckedGmail as is to prevent duplicate checks
       }
+
+      // ARCHIVED: Resume save on sign-in logic - stored in _archived/resume-upload-functionality.tsx
+      // Uncomment when restoring resume upload functionality:
+      // if (
+      //   event === 'SIGNED_IN' &&
+      //   newUser &&
+      //   pendingResumeData &&
+      //   !pendingResumeData.savedToDatabase &&
+      //   uploadedFile &&
+      //   !reuploadInProgress.current
+      // ) {
+      //   setShowSavingModal(true);
+      //   reuploadPendingResume({ silent: true }).then((success) => {
+      //     if (success) {
+      //       // Navigate to matches page after successful save
+      //       setTimeout(() => {
+      //         setShowSavingModal(false);
+      //         router.push('/matches');
+      //       }, 500);
+      //     } else {
+      //       setShowSavingModal(false);
+      //     }
+      //   });
+      // }
 
       // If user signed out, reset Gmail connection state
       if (event === 'SIGNED_OUT') {
@@ -331,6 +353,7 @@ export const Hero = () => {
         setShowGmailConnectModal(false);
         checkingGmailRef.current = false;
         modalScheduledRef.current = false;
+        lastCheckedUserRef.current = null; // Reset tracked user
         if (gmailCheckTimeoutRef.current) {
           clearTimeout(gmailCheckTimeoutRef.current);
           gmailCheckTimeoutRef.current = null;
@@ -340,34 +363,37 @@ export const Hero = () => {
 
     return () => {
       subscription.unsubscribe();
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
+      // ARCHIVED: Progress interval cleanup - uncomment when restoring resume upload
+      // if (progressIntervalRef.current) {
+      //   clearInterval(progressIntervalRef.current);
+      // }
     };
-  }, [pendingResumeData, uploadedFile, toast, reuploadPendingResume, router]);
+  }, [toast, router]);
 
-  useEffect(() => {
-    if (
-      user &&
-      pendingResumeData &&
-      !pendingResumeData.savedToDatabase &&
-      uploadedFile &&
-      !reuploadInProgress.current
-    ) {
-      setShowSavingModal(true);
-      reuploadPendingResume({ silent: true }).then((success) => {
-        if (success) {
-          // Small delay to ensure state is updated
-          setTimeout(() => {
-            setShowSavingModal(false);
-            router.push('/matches');
-          }, 500);
-        } else {
-          setShowSavingModal(false);
-        }
-      });
-    }
-  }, [user, pendingResumeData, uploadedFile, reuploadPendingResume, router]);
+  // ARCHIVED: Resume save effect - stored in _archived/resume-upload-functionality.tsx
+  // Uncomment when restoring resume upload functionality:
+  // useEffect(() => {
+  //   if (
+  //     user &&
+  //     pendingResumeData &&
+  //     !pendingResumeData.savedToDatabase &&
+  //     uploadedFile &&
+  //     !reuploadInProgress.current
+  //   ) {
+  //     setShowSavingModal(true);
+  //     reuploadPendingResume({ silent: true }).then((success) => {
+  //       if (success) {
+  //         // Small delay to ensure state is updated
+  //         setTimeout(() => {
+  //           setShowSavingModal(false);
+  //           router.push('/matches');
+  //         }, 500);
+  //       } else {
+  //         setShowSavingModal(false);
+  //       }
+  //     });
+  //   }
+  // }, [user, pendingResumeData, uploadedFile, reuploadPendingResume, router]);
 
   // Check Gmail connection status
   // DISABLED: Gmail connect functionality temporarily hidden
@@ -493,168 +519,170 @@ export const Hero = () => {
     };
   }, []);
 
-  const startProgressSimulation = () => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
-    setUploadProgress(0);
-    progressIntervalRef.current = setInterval(() => {
-      setUploadProgress((prev) => {
-        const next = prev + Math.random() * 10;
-        return next >= 95 ? 95 : next;
-      });
-    }, 60);
-  };
+  // ARCHIVED: Resume upload handlers - stored in _archived/resume-upload-functionality.tsx
+  // Uncomment when restoring resume upload functionality:
+  // const startProgressSimulation = () => {
+  //   if (progressIntervalRef.current) {
+  //     clearInterval(progressIntervalRef.current);
+  //   }
+  //   setUploadProgress(0);
+  //   progressIntervalRef.current = setInterval(() => {
+  //     setUploadProgress((prev) => {
+  //       const next = prev + Math.random() * 10;
+  //       return next >= 95 ? 95 : next;
+  //     });
+  //   }, 60);
+  // };
 
-  const stopProgressSimulation = () => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
-    }
-  };
+  // const stopProgressSimulation = () => {
+  //   if (progressIntervalRef.current) {
+  //     clearInterval(progressIntervalRef.current);
+  //     progressIntervalRef.current = null;
+  //   }
+  // };
 
-  const simulateMatches = () => {
-    const shuffled = [...SAMPLE_MATCHED_STARTUPS].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 3);
-  };
+  // const simulateMatches = () => {
+  //   const shuffled = [...SAMPLE_MATCHED_STARTUPS].sort(() => Math.random() - 0.5);
+  //   return shuffled.slice(0, 3);
+  // };
 
-  const uploadResume = async (resume: File) => {
-    setIsUploading(true);
-    setShowProgressModal(true);
-    setUploadProgress(5);
-    startProgressSimulation();
+  // const uploadResume = async (resume: File) => {
+  //   setIsUploading(true);
+  //   setShowProgressModal(true);
+  //   setUploadProgress(5);
+  //   startProgressSimulation();
 
-    const formData = new FormData();
-    formData.append("resume", resume);
+  //   const formData = new FormData();
+  //   formData.append("resume", resume);
 
-    try {
-      const response = await fetch("/api/upload-resume", {
-        method: "POST",
-        body: formData,
-        credentials: 'include',
-      });
+  //   try {
+  //     const response = await fetch("/api/upload-resume", {
+  //       method: "POST",
+  //       body: formData,
+  //       credentials: 'include',
+  //     });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error || "Failed to process your resume");
-      }
+  //     if (!response.ok) {
+  //       const data = await response.json().catch(() => null);
+  //       throw new Error(data?.error || "Failed to process your resume");
+  //     }
 
-      stopProgressSimulation();
-      setUploadProgress(100);
+  //     stopProgressSimulation();
+  //     setUploadProgress(100);
       
-      const data = await response.json();
-      const matches = data.matches || [];
-      const count = matches.length;
-      setMatchCount(count);
-      setMatchedStartups(simulateMatches());
+  //     const data = await response.json();
+  //     const matches = data.matches || [];
+  //     const count = matches.length;
+  //     setMatchCount(count);
+  //     setMatchedStartups(simulateMatches());
       
-      const resumePayload = {
-        ...data,
-        savedToDatabase: data.savedToDatabase || false,
-      };
+  //     const resumePayload = {
+  //       ...data,
+  //       savedToDatabase: data.savedToDatabase || false,
+  //     };
 
-      // Store resume data and file temporarily in case user needs to sign in
-      setPendingResumeData(resumePayload);
-      setUploadedFile(resume); // Store the file for potential re-upload
+  //     // Store resume data and file temporarily in case user needs to sign in
+  //     setPendingResumeData(resumePayload);
+  //     setUploadedFile(resume); // Store the file for potential re-upload
 
-      if (resumePayload.savedToDatabase) {
-        clearPendingResumeStorage();
-      } else {
-        await savePendingResumeToStorage(resumePayload, resume);
-      }
+  //     if (resumePayload.savedToDatabase) {
+  //       clearPendingResumeStorage();
+  //     } else {
+  //       await savePendingResumeToStorage(resumePayload, resume);
+  //     }
 
-      setTimeout(() => {
-        setShowProgressModal(false);
-        setShowResultsModal(true);
-        toast({
-          title: "Resume processed",
-          description: `We found ${count} startup${count !== 1 ? 's' : ''} that look like a great fit.`,
-        });
-        setFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-      }, 500);
-    } catch (error) {
-      stopProgressSimulation();
-      setShowProgressModal(false);
-      toast({
-        title: "Upload failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "We couldn't process your resume. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
+  //     setTimeout(() => {
+  //       setShowProgressModal(false);
+  //       setShowResultsModal(true);
+  //       toast({
+  //         title: "Resume processed",
+  //         description: `We found ${count} startup${count !== 1 ? 's' : ''} that look like a great fit.`,
+  //       });
+  //       setFile(null);
+  //       if (fileInputRef.current) {
+  //         fileInputRef.current.value = "";
+  //       }
+  //     }, 500);
+  //   } catch (error) {
+  //     stopProgressSimulation();
+  //     setShowProgressModal(false);
+  //     toast({
+  //       title: "Upload failed",
+  //       description:
+  //         error instanceof Error
+  //           ? error.message
+  //           : "We couldn't process your resume. Please try again.",
+  //       variant: "destructive",
+  //     });
+  //   } finally {
+  //     setIsUploading(false);
+  //   }
+  // };
 
-  const validateAndProcessFile = (selectedFile: File) => {
-    const isPdf = selectedFile.type === 'application/pdf' || selectedFile.name.endsWith('.pdf');
-    const isDocx = selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
-                   selectedFile.name.endsWith('.docx');
+  // const validateAndProcessFile = (selectedFile: File) => {
+  //   const isPdf = selectedFile.type === 'application/pdf' || selectedFile.name.endsWith('.pdf');
+  //   const isDocx = selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+  //                  selectedFile.name.endsWith('.docx');
     
-    if (isPdf || isDocx) {
-      // Allow uploads without sign-in
-      setFile(selectedFile);
-      void uploadResume(selectedFile);
-    } else {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload a PDF or DOCX file",
-        variant: "destructive",
-      });
-    }
-  };
+  //   if (isPdf || isDocx) {
+  //     // Allow uploads without sign-in
+  //     setFile(selectedFile);
+  //     void uploadResume(selectedFile);
+  //   } else {
+  //     toast({
+  //       title: "Invalid file type",
+  //       description: "Please upload a PDF or DOCX file",
+  //       variant: "destructive",
+  //     });
+  //   }
+  // };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      validateAndProcessFile(selectedFile);
-    }
-  };
+  // const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const selectedFile = e.target.files?.[0];
+  //   if (selectedFile) {
+  //     validateAndProcessFile(selectedFile);
+  //   }
+  // };
 
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
+  // const handleDragEnter = (e: React.DragEvent) => {
+  //   e.preventDefault();
+  //   e.stopPropagation();
+  //   setIsDragging(true);
+  // };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
+  // const handleDragLeave = (e: React.DragEvent) => {
+  //   e.preventDefault();
+  //   e.stopPropagation();
+  //   setIsDragging(false);
+  // };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
+  // const handleDragOver = (e: React.DragEvent) => {
+  //   e.preventDefault();
+  //   e.stopPropagation();
+  // };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
+  // const handleDrop = (e: React.DragEvent) => {
+  //   e.preventDefault();
+  //   e.stopPropagation();
+  //   setIsDragging(false);
 
-    const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile) {
-      validateAndProcessFile(droppedFile);
-    }
-  };
+  //   const droppedFile = e.dataTransfer.files?.[0];
+  //   if (droppedFile) {
+  //     validateAndProcessFile(droppedFile);
+  //   }
+  // };
 
-  const handleRemoveFile = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setFile(null);
-    setUploadedFile(null);
-    setPendingResumeData(null);
-    clearPendingResumeStorage();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
+  // const handleRemoveFile = (e: React.MouseEvent) => {
+  //   e.preventDefault();
+  //   e.stopPropagation();
+  //   setFile(null);
+  //   setUploadedFile(null);
+  //   setPendingResumeData(null);
+  //   clearPendingResumeStorage();
+  //   if (fileInputRef.current) {
+  //     fileInputRef.current.value = "";
+  //   }
+  // };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800">
@@ -825,12 +853,12 @@ export const Hero = () => {
           open={isSignInModalOpen} 
           onOpenChange={(open) => {
             setIsSignInModalOpen(open);
-            // If closing sign-in modal and user is now signed in, reopen results modal
-            if (!open && user && pendingResumeData) {
-              setTimeout(() => {
-                setShowResultsModal(true);
-              }, 100);
-            }
+            // ARCHIVED: Resume results modal logic - uncomment when restoring resume upload
+            // if (!open && user && pendingResumeData) {
+            //   setTimeout(() => {
+            //     setShowResultsModal(true);
+            //   }, 100);
+            // }
           }} 
         />
 
@@ -839,15 +867,21 @@ export const Hero = () => {
           open={isSignUpModalOpen} 
           onOpenChange={(open) => {
             setIsSignUpModalOpen(open);
-            // If closing sign-up modal and user is now signed in, reopen results modal
-            if (!open && user && pendingResumeData) {
-              setTimeout(() => {
-                setShowResultsModal(true);
-              }, 100);
-            }
+            // ARCHIVED: Resume results modal logic - uncomment when restoring resume upload
+            // if (!open && user && pendingResumeData) {
+            //   setTimeout(() => {
+            //     setShowResultsModal(true);
+            //   }, 100);
+            // }
           }}
-          fromReview={pendingResumeData !== null && !user}
+          fromReview={false}
           onSwitchToSignIn={() => setIsSignInModalOpen(true)}
+        />
+
+        {/* Waitlist Modal */}
+        <WaitlistModal 
+          open={showWaitlistModal} 
+          onOpenChange={setShowWaitlistModal} 
         />
 
       {/* Content */}
@@ -861,21 +895,19 @@ export const Hero = () => {
                 Matches you with top startups, crafts personalized cold DMs, and saves you hours on professional outreach
               </p>
               <Button
-                onClick={() => {
-                  const uploadSection = document.getElementById('resume-upload-section');
-                  uploadSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
+                onClick={() => setShowWaitlistModal(true)}
                 className="mt-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-400 hover:to-blue-500 px-8 py-6 text-lg font-semibold rounded-xl transition-all hover:scale-105"
               >
-                Get Your Internship
+                Join the Waitlist
               </Button>
           </div>
         </div>
       </div>
     </section>
 
-      {/* Upload Progress Modal */}
-      <Dialog open={showProgressModal} onOpenChange={() => {}}>
+      {/* ARCHIVED: Upload Progress Modal - stored in _archived/resume-upload-functionality.tsx */}
+      {/* Uncomment when restoring resume upload functionality */}
+      {/* <Dialog open={showProgressModal} onOpenChange={() => {}}>
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl font-semibold text-white text-center">
@@ -886,7 +918,6 @@ export const Hero = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 mt-6">
-            {/* Journey Steps */}
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 10 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
@@ -921,8 +952,6 @@ export const Hero = () => {
                 </span>
               </div>
             </div>
-
-            {/* Progress Bar */}
             <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-200"
@@ -934,10 +963,11 @@ export const Hero = () => {
             </p>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
-      {/* Results Modal */}
-      <Dialog open={showResultsModal} onOpenChange={setShowResultsModal}>
+      {/* ARCHIVED: Results Modal - stored in _archived/resume-upload-functionality.tsx */}
+      {/* Uncomment when restoring resume upload functionality */}
+      {/* <Dialog open={showResultsModal} onOpenChange={setShowResultsModal}>
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md text-center space-y-6">
           <DialogHeader>
             <DialogTitle className="text-3xl font-semibold text-white">
@@ -947,8 +977,6 @@ export const Hero = () => {
               Congrats! We found {matchCount} startup{matchCount !== 1 ? 's' : ''} for you and have crafted personalized messages for each of them.
             </DialogDescription>
           </DialogHeader>
-
-          {/* Journey Completion Checklist */}
           <div className="bg-white/5 rounded-2xl p-4 space-y-2 text-left">
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
@@ -963,35 +991,24 @@ export const Hero = () => {
               <span className="text-sm text-white/80">Connect Gmail to automate outreach</span>
             </div>
           </div>
-
-          
           <Button
             className="w-full bg-white text-black hover:bg-white/90"
             onClick={async () => {
               setShowResultsModal(false);
-              
-              // Check if user is signed in
               const { data: { user: currentUser } } = await supabase.auth.getUser();
-              
               if (!currentUser) {
-                // User not signed in - prompt to sign up
-                // Close results modal and show sign-up modal
                 setShowResultsModal(false);
                 setIsSignUpModalOpen(true);
               } else {
-                // User is signed in - save resume if not already saved and show results
                 if (pendingResumeData && !pendingResumeData.savedToDatabase && uploadedFile) {
-                  // Re-upload to save to database now that user is authenticated
                   try {
                     const formData = new FormData();
                     formData.append("resume", uploadedFile);
-                    
                     const saveResponse = await fetch("/api/upload-resume", {
                       method: "POST",
                       body: formData,
                       credentials: 'include',
                     });
-                    
                     if (saveResponse.ok) {
                       toast({
                         title: "Resume saved",
@@ -1008,10 +1025,9 @@ export const Hero = () => {
                       description: "Failed to save your resume. Please try uploading again.",
                       variant: "destructive",
                     });
-                    return; // Don't navigate if save failed
+                    return;
                   }
                 }
-                // Navigate to the matches page
                 window.location.href = '/matches';
               }
             }}
@@ -1019,10 +1035,11 @@ export const Hero = () => {
             Review Your Matches
           </Button>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
-      {/* Saving Resume Modal - Shows after sign-in while saving resume */}
-      <Dialog open={showSavingModal} onOpenChange={() => {}}>
+      {/* ARCHIVED: Saving Resume Modal - stored in _archived/resume-upload-functionality.tsx */}
+      {/* Uncomment when restoring resume upload functionality */}
+      {/* <Dialog open={showSavingModal} onOpenChange={() => {}}>
         <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl font-semibold text-white text-center">
@@ -1038,7 +1055,7 @@ export const Hero = () => {
             </div>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* How It Works Journey Section */}
       <HowItWorksJourney />
@@ -1049,8 +1066,9 @@ export const Hero = () => {
       {/* Features Section */}
       <Features />
 
-      {/* Resume Upload Section */}
-      <section className="py-20 bg-gradient-to-br from-black via-gray-900 to-gray-800">
+      {/* ARCHIVED: Resume Upload Section - stored in _archived/resume-upload-functionality.tsx */}
+      {/* Uncomment when restoring resume upload functionality */}
+      {/* <section className="py-20 bg-gradient-to-br from-black via-gray-900 to-gray-800">
         <div className="container mx-auto px-4">
           <div className="max-w-md mx-auto">
             <div id="resume-upload-section" className="animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
@@ -1115,7 +1133,7 @@ export const Hero = () => {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Footer Section */}
       <Footer />

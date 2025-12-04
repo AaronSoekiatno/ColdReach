@@ -425,6 +425,7 @@ export async function POST(request: NextRequest) {
 
     if (isAuthenticated && accountEmail) {
       // Upload raw resume file to Supabase Storage (resumes bucket)
+      let resumePath: string | undefined;
       try {
         const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
         if (serviceRoleKey) {
@@ -446,8 +447,7 @@ export async function POST(request: NextRequest) {
             console.error('Failed to upload resume file to Storage:', uploadError);
           } else {
             console.log('Uploaded resume file to Storage at path:', objectPath);
-
-            // We will attach resume_path when saving candidate below
+            resumePath = objectPath; // Store the path to attach when saving candidate
           }
         } else {
           console.warn('SUPABASE_SERVICE_ROLE_KEY is not set; skipping resume file upload.');
@@ -502,8 +502,7 @@ export async function POST(request: NextRequest) {
           university: extractionResult.university,
           past_internships: extractionResult.past_internships.join(', '),
           technical_projects: extractionResult.technical_projects.join(', '),
-          // NOTE: ensure a resume_path column exists in public.candidates for this to work
-          // resume_path can be derived from a convention, e.g., latest upload per user.
+          resume_path: resumePath, // Attach the resume file path from Storage
         });
         candidateId = savedCandidate.id; // Get the UUID
         console.log('Successfully saved candidate to Supabase:', {

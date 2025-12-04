@@ -63,6 +63,7 @@ export interface CandidateRow {
   university?: string;
   past_internships?: string; // Comma-separated string
   technical_projects?: string; // Comma-separated string
+  resume_path?: string; // Path to resume file in Supabase Storage
   created_at?: string;
 }
 
@@ -87,6 +88,7 @@ export async function saveCandidate(candidate: CandidateRow): Promise<{ id: stri
         university: candidate.university,
         past_internships: candidate.past_internships,
         technical_projects: candidate.technical_projects,
+        resume_path: candidate.resume_path,
         created_at: candidate.created_at || new Date().toISOString(),
       },
       {
