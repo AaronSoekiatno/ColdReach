@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(dir:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(del /F .gitindex.lock)",
+      "Bash(powershell -Command \"Remove-Item -Path ''.git\\index.lock'' -Force\")"
     ],
     "deny": [],
     "ask": []

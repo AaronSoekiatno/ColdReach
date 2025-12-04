@@ -151,7 +151,6 @@ export default function ResumeUpload() {
 
   return (
     <div className="w-full">
-
       <input
         ref={fileInputRef}
         type="file"

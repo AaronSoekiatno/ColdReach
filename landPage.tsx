@@ -2,9 +2,7 @@
 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-// ARCHIVED: File upload icons - uncomment when restoring resume upload functionality
-// import { Upload, FileText, X } from "lucide-react";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Features } from "@/components/Features";
 import { StartupsCarousel } from "@/components/StartupsCarousel";
@@ -30,112 +28,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import logo from "./images/logo.png";
 
-const PENDING_RESUME_DATA_KEY = "pendingResumeData";
-const PENDING_RESUME_FILE_KEY = "pendingResumeFile";
-
-const fileToDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
-const dataUrlToFile = async (
-  dataUrl: string,
-  fileName: string,
-  mimeType: string
-) => {
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-  return new File([blob], fileName, { type: mimeType || blob.type });
-};
-
-const savePendingResumeToStorage = async (
-  resumeData: any,
-  resumeFile: File
-) => {
-  if (typeof window === "undefined") return;
-  try {
-    sessionStorage.setItem(
-      PENDING_RESUME_DATA_KEY,
-      JSON.stringify(resumeData)
-    );
-    const dataUrl = await fileToDataUrl(resumeFile);
-    sessionStorage.setItem(
-      PENDING_RESUME_FILE_KEY,
-      JSON.stringify({
-        name: resumeFile.name,
-        type: resumeFile.type,
-        dataUrl,
-      })
-    );
-  } catch (error) {
-    console.error("Failed to persist pending resume data", error);
-  }
-};
-
-const loadPendingResumeFromStorage = () => {
-  if (typeof window === "undefined") {
-    return {
-      data: null as any,
-      file: null as { name: string; type: string; dataUrl: string } | null,
-    };
-  }
-  try {
-    const storedData = sessionStorage.getItem(PENDING_RESUME_DATA_KEY);
-    const storedFile = sessionStorage.getItem(PENDING_RESUME_FILE_KEY);
-    return {
-      data: storedData ? JSON.parse(storedData) : null,
-      file: storedFile ? JSON.parse(storedFile) : null,
-    };
-  } catch (error) {
-    console.error("Failed to load pending resume data", error);
-    return {
-      data: null as any,
-      file: null as { name: string; type: string; dataUrl: string } | null,
-    };
-  }
-};
-
-const clearPendingResumeStorage = () => {
-  if (typeof window === "undefined") return;
-  sessionStorage.removeItem(PENDING_RESUME_DATA_KEY);
-  sessionStorage.removeItem(PENDING_RESUME_FILE_KEY);
-};
-
-const SAMPLE_MATCHED_STARTUPS = [
-  "Anthropic",
-  "Perplexity",
-  "Loom",
-  "Vercel",
-  "Linear",
-  "Superhuman",
-  "OpenAI",
-];
-
 export const Hero = () => {
-  const router = useRouter();
-  // ARCHIVED: Resume upload state - stored in _archived/resume-upload-functionality.tsx
-  // Uncomment these when restoring resume upload functionality:
-  // const [file, setFile] = useState<File | null>(null);
-  // const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  // const [showProgressModal, setShowProgressModal] = useState(false);
-  // const [showResultsModal, setShowResultsModal] = useState(false);
-  // const [showSavingModal, setShowSavingModal] = useState(false);
-  // const [isUploading, setIsUploading] = useState(false);
-  // const [uploadProgress, setUploadProgress] = useState(0);
-  // const [matchedStartups, setMatchedStartups] = useState<string[]>([]);
-  // const [matchCount, setMatchCount] = useState<number>(0);
-  // const [pendingResumeData, setPendingResumeData] = useState<any>(null);
-  // const [isDragging, setIsDragging] = useState(false);
-  // const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  // const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // const reuploadInProgress = useRef(false);
-  
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
   const [showWaitlistModal, setShowWaitlistModal] = useState(false);
@@ -147,90 +42,7 @@ export const Hero = () => {
   const checkingGmailRef = useRef(false);
   const gmailCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const modalScheduledRef = useRef(false);
-  const lastCheckedUserRef = useRef<string | null>(null); // Track which user email was last checked
-
-  // ARCHIVED: Resume upload restoration logic - stored in _archived/resume-upload-functionality.tsx
-  // Uncomment when restoring resume upload functionality:
-  // useEffect(() => {
-  //   if (typeof window === "undefined") return;
-  //   const { data, file: storedFile } = loadPendingResumeFromStorage();
-  //   if (data) {
-  //     setPendingResumeData(data);
-  //   }
-  //   if (storedFile) {
-  //     dataUrlToFile(storedFile.dataUrl, storedFile.name, storedFile.type)
-  //       .then((restoredFile) => {
-  //         setUploadedFile(restoredFile);
-  //         setFile(restoredFile);
-  //       })
-  //       .catch((error) => {
-  //         console.error("Failed to restore pending resume file", error);
-  //         clearPendingResumeStorage();
-  //       });
-  //   }
-  // }, []);
-
-  // ARCHIVED: Resume reupload functionality - stored in _archived/resume-upload-functionality.tsx
-  // Uncomment when restoring resume upload functionality:
-  // const reuploadPendingResume = useCallback(
-  //   async (options?: { silent?: boolean }) => {
-  //     if (!uploadedFile || reuploadInProgress.current) {
-  //       return false;
-  //     }
-  //     reuploadInProgress.current = true;
-  //     try {
-  //       const formData = new FormData();
-  //       formData.append("resume", uploadedFile);
-  //       const saveResponse = await fetch("/api/upload-resume", {
-  //         method: "POST",
-  //         body: formData,
-  //         credentials: "include",
-  //       });
-
-  //       if (!saveResponse.ok) {
-  //         const errorData = await saveResponse.json().catch(() => null);
-  //         throw new Error(errorData?.error || "Failed to save resume");
-  //       }
-
-  //       const data = await saveResponse.json();
-  //       const matches = data.matches || [];
-  //       setPendingResumeData({
-  //         ...data,
-  //         savedToDatabase: data.savedToDatabase ?? true,
-  //       });
-  //       setMatchCount(matches.length);
-  //       if (!options?.silent) {
-  //         setShowResultsModal(true);
-  //       }
-
-  //       clearPendingResumeStorage();
-  //       setUploadedFile(null);
-  //       setFile(null);
-
-  //       if (!options?.silent) {
-  //         toast({
-  //           title: "Resume saved",
-  //           description: "Your matches are ready to view.",
-  //         });
-  //       }
-
-  //       return true;
-  //     } catch (error) {
-  //       console.error("Failed to save resume", error);
-  //       if (!options?.silent) {
-  //         toast({
-  //           title: "Error",
-  //           description: "Failed to save your resume. Please try uploading again.",
-  //           variant: "destructive",
-  //         });
-  //       }
-  //       return false;
-  //     } finally {
-  //       reuploadInProgress.current = false;
-  //     }
-  //   },
-  //   [uploadedFile, toast]
-  // );
+  const lastCheckedUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Initialize current user on mount
@@ -295,23 +107,6 @@ export const Hero = () => {
       const newUser = session?.user ?? null;
       setUser(newUser);
 
-      // If user just signed in, check Gmail connection status
-      // DISABLED: Gmail connect functionality temporarily hidden
-      // if (event === 'SIGNED_IN' && newUser) {
-      //   // Only check Gmail connection as part of the sign-in / sign-up flow.
-      //   // Avoid duplicate checks for the same user/email.
-      //   if (
-      //     newUser.email &&
-      //     newUser.email !== lastCheckedUserRef.current &&
-      //     !checkingGmailRef.current &&
-      //     !showGmailConnectModal &&
-      //     !gmailConnected
-      //   ) {
-      //     lastCheckedUserRef.current = newUser.email;
-      //     void checkGmailConnection(newUser);
-      //   }
-      // }
-
       // Reset Gmail check state only when user actually changes (different email)
       if (event === 'SIGNED_IN' && newUser) {
         if (newUser.email && newUser.email !== lastCheckedUserRef.current) {
@@ -321,30 +116,6 @@ export const Hero = () => {
         }
         // If same user, keep hasCheckedGmail as is to prevent duplicate checks
       }
-
-      // ARCHIVED: Resume save on sign-in logic - stored in _archived/resume-upload-functionality.tsx
-      // Uncomment when restoring resume upload functionality:
-      // if (
-      //   event === 'SIGNED_IN' &&
-      //   newUser &&
-      //   pendingResumeData &&
-      //   !pendingResumeData.savedToDatabase &&
-      //   uploadedFile &&
-      //   !reuploadInProgress.current
-      // ) {
-      //   setShowSavingModal(true);
-      //   reuploadPendingResume({ silent: true }).then((success) => {
-      //     if (success) {
-      //       // Navigate to matches page after successful save
-      //       setTimeout(() => {
-      //         setShowSavingModal(false);
-      //         router.push('/matches');
-      //       }, 500);
-      //     } else {
-      //       setShowSavingModal(false);
-      //     }
-      //   });
-      // }
 
       // If user signed out, reset Gmail connection state
       if (event === 'SIGNED_OUT') {
@@ -363,37 +134,8 @@ export const Hero = () => {
 
     return () => {
       subscription.unsubscribe();
-      // ARCHIVED: Progress interval cleanup - uncomment when restoring resume upload
-      // if (progressIntervalRef.current) {
-      //   clearInterval(progressIntervalRef.current);
-      // }
     };
-  }, [toast, router]);
-
-  // ARCHIVED: Resume save effect - stored in _archived/resume-upload-functionality.tsx
-  // Uncomment when restoring resume upload functionality:
-  // useEffect(() => {
-  //   if (
-  //     user &&
-  //     pendingResumeData &&
-  //     !pendingResumeData.savedToDatabase &&
-  //     uploadedFile &&
-  //     !reuploadInProgress.current
-  //   ) {
-  //     setShowSavingModal(true);
-  //     reuploadPendingResume({ silent: true }).then((success) => {
-  //       if (success) {
-  //         // Small delay to ensure state is updated
-  //         setTimeout(() => {
-  //           setShowSavingModal(false);
-  //           router.push('/matches');
-  //         }, 500);
-  //       } else {
-  //         setShowSavingModal(false);
-  //       }
-  //     });
-  //   }
-  // }, [user, pendingResumeData, uploadedFile, reuploadPendingResume, router]);
+  }, [toast]);
 
   // Check Gmail connection status
   // DISABLED: Gmail connect functionality temporarily hidden
@@ -503,7 +245,6 @@ export const Hero = () => {
 
   // Check Gmail connection when user is available
   useEffect(() => {
-    // Only check if all conditions are met and we're not already checking
     if (user && !hasCheckedGmail && !showGmailConnectModal && !gmailConnected && !checkingGmailRef.current) {
       void checkGmailConnection();
     }
@@ -518,171 +259,6 @@ export const Hero = () => {
       }
     };
   }, []);
-
-  // ARCHIVED: Resume upload handlers - stored in _archived/resume-upload-functionality.tsx
-  // Uncomment when restoring resume upload functionality:
-  // const startProgressSimulation = () => {
-  //   if (progressIntervalRef.current) {
-  //     clearInterval(progressIntervalRef.current);
-  //   }
-  //   setUploadProgress(0);
-  //   progressIntervalRef.current = setInterval(() => {
-  //     setUploadProgress((prev) => {
-  //       const next = prev + Math.random() * 10;
-  //       return next >= 95 ? 95 : next;
-  //     });
-  //   }, 60);
-  // };
-
-  // const stopProgressSimulation = () => {
-  //   if (progressIntervalRef.current) {
-  //     clearInterval(progressIntervalRef.current);
-  //     progressIntervalRef.current = null;
-  //   }
-  // };
-
-  // const simulateMatches = () => {
-  //   const shuffled = [...SAMPLE_MATCHED_STARTUPS].sort(() => Math.random() - 0.5);
-  //   return shuffled.slice(0, 3);
-  // };
-
-  // const uploadResume = async (resume: File) => {
-  //   setIsUploading(true);
-  //   setShowProgressModal(true);
-  //   setUploadProgress(5);
-  //   startProgressSimulation();
-
-  //   const formData = new FormData();
-  //   formData.append("resume", resume);
-
-  //   try {
-  //     const response = await fetch("/api/upload-resume", {
-  //       method: "POST",
-  //       body: formData,
-  //       credentials: 'include',
-  //     });
-
-  //     if (!response.ok) {
-  //       const data = await response.json().catch(() => null);
-  //       throw new Error(data?.error || "Failed to process your resume");
-  //     }
-
-  //     stopProgressSimulation();
-  //     setUploadProgress(100);
-      
-  //     const data = await response.json();
-  //     const matches = data.matches || [];
-  //     const count = matches.length;
-  //     setMatchCount(count);
-  //     setMatchedStartups(simulateMatches());
-      
-  //     const resumePayload = {
-  //       ...data,
-  //       savedToDatabase: data.savedToDatabase || false,
-  //     };
-
-  //     // Store resume data and file temporarily in case user needs to sign in
-  //     setPendingResumeData(resumePayload);
-  //     setUploadedFile(resume); // Store the file for potential re-upload
-
-  //     if (resumePayload.savedToDatabase) {
-  //       clearPendingResumeStorage();
-  //     } else {
-  //       await savePendingResumeToStorage(resumePayload, resume);
-  //     }
-
-  //     setTimeout(() => {
-  //       setShowProgressModal(false);
-  //       setShowResultsModal(true);
-  //       toast({
-  //         title: "Resume processed",
-  //         description: `We found ${count} startup${count !== 1 ? 's' : ''} that look like a great fit.`,
-  //       });
-  //       setFile(null);
-  //       if (fileInputRef.current) {
-  //         fileInputRef.current.value = "";
-  //       }
-  //     }, 500);
-  //   } catch (error) {
-  //     stopProgressSimulation();
-  //     setShowProgressModal(false);
-  //     toast({
-  //       title: "Upload failed",
-  //       description:
-  //         error instanceof Error
-  //           ? error.message
-  //           : "We couldn't process your resume. Please try again.",
-  //       variant: "destructive",
-  //     });
-  //   } finally {
-  //     setIsUploading(false);
-  //   }
-  // };
-
-  // const validateAndProcessFile = (selectedFile: File) => {
-  //   const isPdf = selectedFile.type === 'application/pdf' || selectedFile.name.endsWith('.pdf');
-  //   const isDocx = selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
-  //                  selectedFile.name.endsWith('.docx');
-    
-  //   if (isPdf || isDocx) {
-  //     // Allow uploads without sign-in
-  //     setFile(selectedFile);
-  //     void uploadResume(selectedFile);
-  //   } else {
-  //     toast({
-  //       title: "Invalid file type",
-  //       description: "Please upload a PDF or DOCX file",
-  //       variant: "destructive",
-  //     });
-  //   }
-  // };
-
-  // const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const selectedFile = e.target.files?.[0];
-  //   if (selectedFile) {
-  //     validateAndProcessFile(selectedFile);
-  //   }
-  // };
-
-  // const handleDragEnter = (e: React.DragEvent) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   setIsDragging(true);
-  // };
-
-  // const handleDragLeave = (e: React.DragEvent) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   setIsDragging(false);
-  // };
-
-  // const handleDragOver = (e: React.DragEvent) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  // };
-
-  // const handleDrop = (e: React.DragEvent) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   setIsDragging(false);
-
-  //   const droppedFile = e.dataTransfer.files?.[0];
-  //   if (droppedFile) {
-  //     validateAndProcessFile(droppedFile);
-  //   }
-  // };
-
-  // const handleRemoveFile = (e: React.MouseEvent) => {
-  //   e.preventDefault();
-  //   e.stopPropagation();
-  //   setFile(null);
-  //   setUploadedFile(null);
-  //   setPendingResumeData(null);
-  //   clearPendingResumeStorage();
-  //   if (fileInputRef.current) {
-  //     fileInputRef.current.value = "";
-  //   }
-  // };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800">
@@ -851,29 +427,13 @@ export const Hero = () => {
         {/* Sign In Modal */}
         <SignInModal 
           open={isSignInModalOpen} 
-          onOpenChange={(open) => {
-            setIsSignInModalOpen(open);
-            // ARCHIVED: Resume results modal logic - uncomment when restoring resume upload
-            // if (!open && user && pendingResumeData) {
-            //   setTimeout(() => {
-            //     setShowResultsModal(true);
-            //   }, 100);
-            // }
-          }} 
+          onOpenChange={setIsSignInModalOpen} 
         />
 
         {/* Sign Up Modal */}
         <SignUpModal 
           open={isSignUpModalOpen} 
-          onOpenChange={(open) => {
-            setIsSignUpModalOpen(open);
-            // ARCHIVED: Resume results modal logic - uncomment when restoring resume upload
-            // if (!open && user && pendingResumeData) {
-            //   setTimeout(() => {
-            //     setShowResultsModal(true);
-            //   }, 100);
-            // }
-          }}
+          onOpenChange={setIsSignUpModalOpen}
           fromReview={false}
           onSwitchToSignIn={() => setIsSignInModalOpen(true)}
         />
@@ -905,158 +465,6 @@ export const Hero = () => {
       </div>
     </section>
 
-      {/* ARCHIVED: Upload Progress Modal - stored in _archived/resume-upload-functionality.tsx */}
-      {/* Uncomment when restoring resume upload functionality */}
-      {/* <Dialog open={showProgressModal} onOpenChange={() => {}}>
-        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-semibold text-white text-center">
-              Creating Your Matches
-            </DialogTitle>
-            <DialogDescription className="text-white/60 text-center">
-              Hang tight while we work our magic
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6 mt-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 10 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
-                  {uploadProgress > 10 ? '✓' : '1'}
-                </div>
-                <span className={`text-sm ${uploadProgress > 10 ? 'text-white' : 'text-white/60'}`}>
-                  Analyzing your resume...
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 40 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
-                  {uploadProgress > 40 ? '✓' : '2'}
-                </div>
-                <span className={`text-sm ${uploadProgress > 40 ? 'text-white' : 'text-white/60'}`}>
-                  Finding aligned startups...
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 70 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
-                  {uploadProgress > 70 ? '✓' : '3'}
-                </div>
-                <span className={`text-sm ${uploadProgress > 70 ? 'text-white' : 'text-white/60'}`}>
-                  Preparing personalized messages...
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress >= 100 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
-                  {uploadProgress >= 100 ? '✓' : '4'}
-                </div>
-                <span className={`text-sm ${uploadProgress >= 100 ? 'text-white' : 'text-white/60'}`}>
-                  Ready to review your matches!
-                </span>
-              </div>
-            </div>
-            <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-200"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-            <p className="text-center text-white/70 text-sm">
-              {Math.round(uploadProgress)}% complete
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog> */}
-
-      {/* ARCHIVED: Results Modal - stored in _archived/resume-upload-functionality.tsx */}
-      {/* Uncomment when restoring resume upload functionality */}
-      {/* <Dialog open={showResultsModal} onOpenChange={setShowResultsModal}>
-        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md text-center space-y-6">
-          <DialogHeader>
-            <DialogTitle className="text-3xl font-semibold text-white">
-              Your Matches Are Ready!
-            </DialogTitle>
-            <DialogDescription className="text-lg text-white">
-              Congrats! We found {matchCount} startup{matchCount !== 1 ? 's' : ''} for you and have crafted personalized messages for each of them.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="bg-white/5 rounded-2xl p-4 space-y-2 text-left">
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
-              <span className="text-sm text-white">{matchCount} perfect-fit startup{matchCount !== 1 ? 's' : ''} matched</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
-              <span className="text-sm text-white">Personalized cold DMs ready to send</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-xs">→</div>
-              <span className="text-sm text-white/80">Connect Gmail to automate outreach</span>
-            </div>
-          </div>
-          <Button
-            className="w-full bg-white text-black hover:bg-white/90"
-            onClick={async () => {
-              setShowResultsModal(false);
-              const { data: { user: currentUser } } = await supabase.auth.getUser();
-              if (!currentUser) {
-                setShowResultsModal(false);
-                setIsSignUpModalOpen(true);
-              } else {
-                if (pendingResumeData && !pendingResumeData.savedToDatabase && uploadedFile) {
-                  try {
-                    const formData = new FormData();
-                    formData.append("resume", uploadedFile);
-                    const saveResponse = await fetch("/api/upload-resume", {
-                      method: "POST",
-                      body: formData,
-                      credentials: 'include',
-                    });
-                    if (saveResponse.ok) {
-                      toast({
-                        title: "Resume saved",
-                        description: "Your matches are ready to view.",
-                      });
-                      setPendingResumeData(null);
-                      setUploadedFile(null);
-                    } else {
-                      throw new Error("Failed to save resume");
-                    }
-                  } catch (error) {
-                    toast({
-                      title: "Error",
-                      description: "Failed to save your resume. Please try uploading again.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                }
-                window.location.href = '/matches';
-              }
-            }}
-          >
-            Review Your Matches
-          </Button>
-        </DialogContent>
-      </Dialog> */}
-
-      {/* ARCHIVED: Saving Resume Modal - stored in _archived/resume-upload-functionality.tsx */}
-      {/* Uncomment when restoring resume upload functionality */}
-      {/* <Dialog open={showSavingModal} onOpenChange={() => {}}>
-        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-semibold text-white text-center">
-              Saving your resume
-            </DialogTitle>
-            <DialogDescription className="text-white/60 text-center">
-              Please wait while we save your matches...
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog> */}
-
       {/* How It Works Journey Section */}
       <HowItWorksJourney />
 
@@ -1065,75 +473,6 @@ export const Hero = () => {
 
       {/* Features Section */}
       <Features />
-
-      {/* ARCHIVED: Resume Upload Section - stored in _archived/resume-upload-functionality.tsx */}
-      {/* Uncomment when restoring resume upload functionality */}
-      {/* <section className="py-20 bg-gradient-to-br from-black via-gray-900 to-gray-800">
-        <div className="container mx-auto px-4">
-          <div className="max-w-md mx-auto">
-            <div id="resume-upload-section" className="animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-              <div className="relative">
-                <input
-                  id="resume"
-                  type="file"
-                  accept=".pdf,.docx"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  ref={fileInputRef}
-                />
-                <div
-                  onDragEnter={handleDragEnter}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`flex flex-col items-center justify-center gap-3 bg-white/10 border-2 border-dashed rounded-lg p-8 cursor-pointer transition-all ${
-                    isDragging 
-                      ? 'border-blue-500 bg-blue-500/20 scale-105' 
-                      : 'border-white/20 hover:border-white/40 hover:bg-white/15'
-                  }`}
-                >
-                  {file ? (
-                    <>
-                      <div className="flex items-center gap-3 w-full">
-                        <FileText className="h-8 w-8 text-white/60" />
-                        <span className="text-white text-sm flex-1 truncate">
-                          {file.name}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveFile(e);
-                          }}
-                          className="text-white/60 hover:text-white transition-colors flex-shrink-0"
-                          aria-label="Remove file"
-                        >
-                          <X className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-12 w-12 text-white/60" />
-                      <div className="text-center">
-                        <p className="text-white text-sm font-medium mb-1">
-                          {isDragging ? 'Drop your resume here' : 'Upload your resume here'}
-                        </p>
-                        <p className="text-white/60 text-xs">
-                          PDF or DOCX files only
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <p className="text-white/70 text-sm mt-4 text-center font-medium">
-                  One resume upload → Personalized outreach to dozens of startups
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section> */}
 
       {/* Footer Section */}
       <Footer />
