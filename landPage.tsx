@@ -463,12 +463,12 @@ export const Hero = () => {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800">
+    <div className="min-h-screen" style={{ backgroundColor: '#0E1422' }}>
       {/* Sticky Header */}
-      <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/10 border-b border-white/20">
-        <div className="container mx-auto px-8 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-50 w-full pt-2" style={{ backgroundColor: '#0E1422' }}>
+        <div className="container mx-auto px-16 py-4 flex items-center justify-between">
           {/* Logo and Title */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-2">
             <Image
               src={logo}
               alt="Hermes logo"
@@ -479,7 +479,7 @@ export const Hero = () => {
           </Link>
 
           {/* Sign In Button / Account Indicator */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
             {user ? (
               <>
                 <Link
@@ -533,18 +533,18 @@ export const Hero = () => {
                 </DropdownMenu>
               </>
             ) : (
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setIsSignInModalOpen(true)}
-                  className="text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
-                >
-                  Sign In
-                </button>
+              <div className="flex items-center gap-5">
                 <button
                   onClick={() => setIsSignUpModalOpen(true)}
-                  className="text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                  className="text-sm font-semibold text-white transition-all border border-transparent bg-white/10 rounded-2xl px-5 py-2 hover:bg-white/20 focus:outline-none"
                 >
-                  Sign Up
+                  Sign up
+                </button>
+                <button
+                  onClick={() => setIsSignInModalOpen(true)}
+                  className="text-sm font-semibold text-white transition-opacity hover:opacity-70 focus:outline-none"
+                >
+                  Log in
                 </button>
               </div>
             )}
@@ -647,7 +647,7 @@ export const Hero = () => {
         />
 
       {/* Content */}
-      <div className="container relative z-10 px-4 py-20">
+      <div className="container relative z-10 px-4 pb-36">
         <div className="max-w-4xl mx-auto text-center space-y-12">
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
               <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
