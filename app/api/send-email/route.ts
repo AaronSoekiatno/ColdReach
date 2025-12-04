@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { startupId, matchScore } = await request.json();
+    const { startupId, matchScore, subject: customSubject, body: customBody } = await request.json();
 
     if (!startupId || matchScore === undefined) {
       return NextResponse.json(
@@ -90,34 +90,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate email
-    const generatedEmail = await generateColdEmail(
-      {
-        name: candidate.name,
-        email: candidate.email,
-        summary: candidate.summary,
-        // Split skills string into non-empty, trimmed values
-        skills: candidate.skills
-          .split(', ')
-          .map((s: string) => s.trim())
-          .filter((s: string) => s.length > 0),
-      },
-      {
-        name: startup.name,
-        industry: startup.industry,
-        description: startup.description,
-        fundingStage: startup.funding_stage,
-        fundingAmount: startup.funding_amount,
-        location: startup.location,
-        website: startup.website,
-        // Split tags string into non-empty, trimmed values
-        tags: startup.tags
-          ?.split(', ')
-          .map((t: string) => t.trim())
-          .filter((t: string) => t.length > 0),
-      },
-      { score: matchScore }
-    );
+    // Use custom subject/body if provided, otherwise generate email
+    let emailSubject: string;
+    let emailBody: string;
+    
+    if (customSubject && customBody) {
+      // User edited the email - use their custom version
+      emailSubject = customSubject;
+      emailBody = customBody;
+    } else {
+      // Generate email as before
+      const generatedEmail = await generateColdEmail(
+        {
+          name: candidate.name,
+          email: candidate.email,
+          summary: candidate.summary,
+          // Split skills string into non-empty, trimmed values
+          skills: candidate.skills
+            .split(', ')
+            .map((s: string) => s.trim())
+            .filter((s: string) => s.length > 0),
+        },
+        {
+          name: startup.name,
+          industry: startup.industry,
+          description: startup.description,
+          fundingStage: startup.funding_stage,
+          fundingAmount: startup.funding_amount,
+          location: startup.location,
+          website: startup.website,
+          // Split tags string into non-empty, trimmed values
+          tags: startup.tags
+            ?.split(', ')
+            .map((t: string) => t.trim())
+            .filter((t: string) => t.length > 0),
+        },
+        { score: matchScore }
+      );
+      emailSubject = generatedEmail.subject;
+      emailBody = generatedEmail.body;
+    }
 
     // Set up OAuth client with stored tokens
     oauth2Client.setCredentials({
@@ -156,10 +168,10 @@ export async function POST(request: NextRequest) {
     // Create email message
     const message = [
       `To: ${targetEmail}`,
-      `Subject: ${generatedEmail.subject}`,
+      `Subject: ${emailSubject}`,
       'Content-Type: text/plain; charset=utf-8',
       '',
-      generatedEmail.body,
+      emailBody,
     ].join('\n');
 
     const encodedMessage = Buffer.from(message)

@@ -10,7 +10,7 @@ import {
   type ResumeProcessingResult,
 } from './utils';
 import { upsertCandidate, findMatchingStartups } from '@/lib/pinecone';
-import { saveCandidate, saveMatches, saveStartup, isSubscribed } from '@/lib/supabase';
+import { saveCandidate, saveMatches, saveStartup, isSubscribed, findStartupIdByName } from '@/lib/supabase';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 
@@ -614,38 +614,59 @@ export async function POST(request: NextRequest) {
       // Save matches to Supabase - only if authenticated and we have a candidate ID
       if (matches.length > 0 && isAuthenticated && candidateId) {
         try {
-          // First, ensure all matched startups exist in Supabase
-          // This prevents foreign key constraint violations
-          console.log(`Syncing ${matches.length} matched startups to Supabase...`);
+          // Map Pinecone matches to Supabase startup IDs
+          // This ensures we use existing Supabase data (with founder emails) instead of creating duplicates
+          console.log(`Mapping ${matches.length} matched startups to Supabase IDs...`);
+          const matchMappings: Array<{ startup_id: string; score: number }> = [];
+
           for (const match of matches) {
             try {
-              await saveStartup({
-                id: match.id,
-                name: match.metadata.name || 'Unknown',
-                industry: match.metadata.industry || '',
-                description: match.metadata.description || '',
-                funding_stage: match.metadata.funding_stage || '',
-                funding_amount: match.metadata.funding_amount || '',
-                location: match.metadata.location || '',
-                website: match.metadata.website || '',
-                tags: match.metadata.tags || '',
-              });
+              const startupName = match.metadata.name || 'Unknown';
+              
+              // First, try to find existing startup in Supabase by name (case-insensitive)
+              // This ensures we use the canonical Supabase startup with founder emails
+              let supabaseStartupId = await findStartupIdByName(startupName);
+
+              if (supabaseStartupId) {
+                // Startup exists in Supabase - use that ID
+                console.log(`  ✓ Found existing startup "${startupName}" in Supabase (ID: ${supabaseStartupId})`);
+                matchMappings.push({
+                  startup_id: supabaseStartupId,
+                  score: match.score,
+                });
+              } else {
+                // Startup doesn't exist in Supabase - create it using Pinecone data
+                // This should rarely happen if all startups were ingested from CSV
+                console.log(`  ⚠ Startup "${startupName}" not found in Supabase, creating new entry...`);
+                await saveStartup({
+                  id: match.id, // Use Pinecone ID for new startups
+                  name: startupName,
+                  industry: match.metadata.industry || '',
+                  description: match.metadata.description || '',
+                  funding_stage: match.metadata.funding_stage || '',
+                  funding_amount: match.metadata.funding_amount || '',
+                  location: match.metadata.location || '',
+                  website: match.metadata.website || '',
+                  tags: match.metadata.tags || '',
+                });
+                matchMappings.push({
+                  startup_id: match.id,
+                  score: match.score,
+                });
+              }
             } catch (error) {
-              console.warn(`Failed to sync startup ${match.id} to Supabase:`, error instanceof Error ? error.message : 'Unknown error');
+              console.warn(`Failed to process startup "${match.metadata.name}":`, error instanceof Error ? error.message : 'Unknown error');
               // Continue with other startups even if one fails
             }
           }
 
-          // Now save the matches (foreign keys should be valid now)
+          // Now save the matches using Supabase startup IDs
           // Always save all quality matches so the UI can upsell based on hidden matches.
           // Free users will still only SEE the first match in the UI, but additional
           // matches are stored and counted for the Premium upgrade modal.
           await saveMatches(
             candidateId, // Use UUID instead of email
-            matches.map((match) => ({
-              startup_id: match.id,
-              score: match.score,
-            }))
+            matchMappings
           );
           const isPremium = isSubscribed({ subscription_tier: subscriptionTier, subscription_status: subscriptionStatus });
           console.log(

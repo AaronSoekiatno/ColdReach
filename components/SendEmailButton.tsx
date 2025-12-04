@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -114,6 +116,9 @@ export const SendEmailButton = ({
         body: JSON.stringify({
           startupId,
           matchScore,
+          // Include edited subject and body if user made changes
+          subject: previewSubject,
+          body: previewBody,
         }),
       });
 
@@ -127,6 +132,11 @@ export const SendEmailButton = ({
         title: "Email sent!",
         description: "Your email has been sent successfully to the founder.",
       });
+
+      // Close dialog and reset state
+      setIsDialogOpen(false);
+      setPreviewSubject(null);
+      setPreviewBody(null);
 
       if (onSent) {
         onSent();
@@ -178,21 +188,29 @@ export const SendEmailButton = ({
             Preview your email
           </DialogTitle>
           <DialogDescription className="text-white/70">
-            This is the email that will be sent from your Gmail account to the founder. You can review it before sending.
+            This is the email that will be sent from your Gmail account to the founder. You can review and edit it before sending.
           </DialogDescription>
         </DialogHeader>
 
-        {previewSubject && (
-          <div className="space-y-2 text-sm">
-            <div>
-              <span className="font-semibold text-white">Subject:</span>{" "}
-              <span className="text-white/90">{previewSubject}</span>
+        {previewSubject && previewBody && (
+          <div className="space-y-4 text-sm">
+            <div className="space-y-2">
+              <label className="font-semibold text-white block">Subject:</label>
+              <Input
+                value={previewSubject}
+                onChange={(e) => setPreviewSubject(e.target.value)}
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40"
+                placeholder="Email subject"
+              />
             </div>
-            <div className="mt-4">
-              <span className="font-semibold text-white block mb-2">Body:</span>
-              <div className="max-h-80 overflow-y-auto rounded-lg border border-white/20 bg-white/5 p-3 text-sm whitespace-pre-wrap text-white/90">
-                {previewBody}
-              </div>
+            <div className="space-y-2">
+              <label className="font-semibold text-white block">Body:</label>
+              <Textarea
+                value={previewBody}
+                onChange={(e) => setPreviewBody(e.target.value)}
+                className="min-h-[300px] max-h-[400px] bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40 resize-y"
+                placeholder="Email body"
+              />
             </div>
           </div>
         )}
