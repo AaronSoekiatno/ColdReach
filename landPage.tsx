@@ -685,6 +685,12 @@ export const Hero = () => {
                 >
                   Your Matches
                 </Link>
+                <Link
+                  href="/history"
+                  className="text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                >
+                  History
+                </Link>
                 <button
                   onClick={() => setShowPremiumModal(true)}
                   className="text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"

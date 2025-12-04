@@ -263,6 +263,40 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Save email history to database
+    try {
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (serviceRoleKey && candidate.id) {
+        const supabaseAdmin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          serviceRoleKey
+        );
+
+        // Get recipient name (founder name if available)
+        const recipientName = startup.founder_first_name && startup.founder_last_name
+          ? `${startup.founder_first_name} ${startup.founder_last_name}`
+          : startup.founder_first_name || startup.founder_last_name || null;
+
+        await supabaseAdmin
+          .from('sent_emails')
+          .insert({
+            candidate_id: candidate.id,
+            startup_id: startup.id,
+            recipient_email: targetEmail,
+            recipient_name: recipientName,
+            subject: emailSubject,
+            body: emailBody,
+            match_score: matchScore,
+            sent_at: new Date().toISOString(),
+          });
+
+        console.log('Email history saved successfully');
+      }
+    } catch (historyError) {
+      // Log error but don't fail the request - email was already sent
+      console.error('Failed to save email history:', historyError);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Email sent successfully',
