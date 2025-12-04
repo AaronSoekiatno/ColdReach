@@ -4,12 +4,14 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UpgradeButton } from "@/components/UpgradeButton";
+import { Button } from "@/components/ui/button";
 
 interface UpgradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   hiddenMatchCount: number;
   email: string;
+  onDismiss?: () => void;
 }
 
 const freeFeatures = [
@@ -26,9 +28,17 @@ const premiumFeatures = [
   "Priority support",
 ];
 
-export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email }: UpgradeModalProps) {
+export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDismiss }: UpgradeModalProps) {
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        onOpenChange(nextOpen);
+        if (!nextOpen) {
+          onDismiss?.();
+        }
+      }}
+    >
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className={cn(
@@ -71,9 +81,17 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email }: Up
                   ))}
                 </div>
                 <div className="mt-auto">
-                  <div className="w-full py-2.5 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm font-medium text-center">
-                    Current plan
-                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onDismiss?.();
+                    }}
+                    className="w-full py-2.5 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm font-medium text-center hover:bg-green-500/30 transition-colors"
+                  >
+                    Continue with Free
+                  </Button>
                 </div>
               </div>
 

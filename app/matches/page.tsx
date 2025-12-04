@@ -66,34 +66,79 @@ export default async function MatchesPage() {
     redirect('/?error=no_resume');
   }
 
-  const { data: matches, error } = await supabaseAdmin
+  // STEP 1: Load raw matches (without relying on Supabase FK relationships)
+  const { data: rawMatches, error: matchError } = await supabaseAdmin
     .from('matches')
-    .select(
-      `
-        id,
-        score,
-        matched_at,
-        startup:startups (
-          id,
-          name,
-          industry,
-          location,
-          funding_stage,
-          funding_amount,
-          tags,
-          website,
-          founder_emails
-        )
-      `
-    )
+    .select('id, score, matched_at, startup_id')
     .eq('candidate_id', candidate.id)
     .order('score', { ascending: false });
 
-  if (error) {
-    throw new Error(`Failed to load matches: ${error.message}`);
+  if (matchError) {
+    throw new Error(`Failed to load matches: ${matchError.message}`);
   }
 
-  const typedMatches = ((matches ?? []) as unknown) as MatchRecord[];
+  type RawMatch = {
+    id: string;
+    score: number;
+    matched_at: string;
+    startup_id: string;
+  };
+
+  const typedRawMatches = ((rawMatches ?? []) as unknown) as RawMatch[];
+
+  // STEP 2: Load all referenced startups in a separate query
+  const startupIds = Array.from(
+    new Set(
+      typedRawMatches
+        .map((m) => m.startup_id)
+        .filter((id): id is string => !!id)
+    )
+  );
+
+  let startupsById: Record<
+    string,
+    {
+      id: string;
+      name: string;
+      industry: string;
+      location: string;
+      funding_stage: string;
+      funding_amount: string;
+      tags: string;
+      website: string;
+      founder_emails?: string;
+    }
+  > = {};
+
+  if (startupIds.length > 0) {
+    const { data: startupRows, error: startupsError } = await supabaseAdmin
+      .from('startups')
+      .select(
+        'id, name, industry, location, funding_stage, funding_amount, tags, website, founder_emails'
+      )
+      .in('id', startupIds);
+
+    if (startupsError) {
+      throw new Error(`Failed to load startups: ${startupsError.message}`);
+    }
+
+    for (const s of startupRows ?? []) {
+      startupsById[s.id] = {
+        ...s,
+        // Normalize null to undefined so types align with MatchCard expectations
+        founder_emails: s.founder_emails ?? undefined,
+      };
+    }
+  }
+
+  // STEP 3: Manually join matches with their startup data
+  const typedMatches: MatchRecord[] = typedRawMatches.map((m) => ({
+    id: m.id,
+    score: m.score,
+    matched_at: m.matched_at,
+    startup: startupsById[m.startup_id] ?? null,
+  }));
+
   const hasMatches = typedMatches.length > 0;
 
   // Check subscription status

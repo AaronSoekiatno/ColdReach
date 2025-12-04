@@ -427,6 +427,11 @@ export async function POST(request: NextRequest) {
 
     if (isAuthenticated && accountEmail) {
       // Upload raw resume file to Supabase Storage (resumes bucket)
+      // We only want ONE resume file per user to avoid storage bloat.
+      // Strategy:
+      // 1. List any existing files in the user's resumes folder and delete them.
+      // 2. Upload the new resume to a deterministic path like `resumes/{userId}/resume.ext`
+      //    with upsert enabled, so the latest resume always replaces the previous one.
       let resumePath: string | undefined;
       try {
         const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -436,12 +441,42 @@ export async function POST(request: NextRequest) {
             serviceRoleKey
           );
 
-          const objectPath = `resumes/${user!.id}/${Date.now()}-${file!.name}`;
+          const userId = user!.id;
+          const folderPath = `resumes/${userId}`;
+
+          try {
+            // List and remove any existing files for this user to ensure only one resume is stored
+            const { data: existingFiles, error: listError } = await supabaseAdmin.storage
+              .from('resumes')
+              .list(folderPath, { limit: 100 });
+
+            if (listError) {
+              console.warn('Failed to list existing resume files for user; continuing anyway:', listError);
+            } else if (existingFiles && existingFiles.length > 0) {
+              const pathsToRemove = existingFiles.map((f) => `${folderPath}/${f.name}`);
+              const { error: removeError } = await supabaseAdmin.storage
+                .from('resumes')
+                .remove(pathsToRemove);
+              if (removeError) {
+                console.warn('Failed to remove existing resume files; continuing anyway:', removeError);
+              } else {
+                console.log(`Removed ${pathsToRemove.length} existing resume file(s) for user ${userId}`);
+              }
+            }
+          } catch (cleanupError) {
+            console.warn('Unexpected error while cleaning up existing resume files:', cleanupError);
+          }
+
+          // Derive a stable file name using the original extension if available
+          const originalName = file!.name || 'resume.pdf';
+          const ext = originalName.includes('.') ? originalName.split('.').pop() : 'pdf';
+          const safeExt = ext || 'pdf';
+          const objectPath = `${folderPath}/resume.${safeExt}`;
 
           const { error: uploadError } = await supabaseAdmin.storage
             .from('resumes')
             .upload(objectPath, buffer, {
-              contentType: file!.type,
+              contentType: file!.type || 'application/octet-stream',
               upsert: true,
             });
 
@@ -602,18 +637,24 @@ export async function POST(request: NextRequest) {
           }
 
           // Now save the matches (foreign keys should be valid now)
-          // For free users, only save the top 1 match
-          const isPremium = isSubscribed({ subscription_tier: subscriptionTier, subscription_status: subscriptionStatus });
-          const matchesToSave = isPremium ? matches : matches.slice(0, 1);
-
+          // Always save all quality matches so the UI can upsell based on hidden matches.
+          // Free users will still only SEE the first match in the UI, but additional
+          // matches are stored and counted for the Premium upgrade modal.
           await saveMatches(
             candidateId, // Use UUID instead of email
-            matchesToSave.map((match) => ({
+            matches.map((match) => ({
               startup_id: match.id,
               score: match.score,
             }))
           );
-          console.log(`✓ Successfully saved ${matchesToSave.length} matches to Supabase for candidate ${candidateId}${isPremium ? '' : ' (Free tier - limited to 1 match)'}`);
+          const isPremium = isSubscribed({ subscription_tier: subscriptionTier, subscription_status: subscriptionStatus });
+          console.log(
+            `✓ Successfully saved ${matches.length} matches to Supabase for candidate ${candidateId}${
+              isPremium
+                ? ''
+                : ' (Free tier - UI will show 1 match, additional matches are locked behind Premium)'
+            }`
+          );
         } catch (error) {
           console.error('✗ Failed to save matches to Supabase:', {
             error: error instanceof Error ? error.message : 'Unknown error',
