@@ -29,7 +29,92 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import logo from "./images/logo.png";
+
+const PENDING_RESUME_DATA_KEY = "pendingResumeData";
+const PENDING_RESUME_FILE_KEY = "pendingResumeFile";
+
+const fileToDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+const dataUrlToFile = async (
+  dataUrl: string,
+  fileName: string,
+  mimeType: string
+) => {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return new File([blob], fileName, { type: mimeType || blob.type });
+};
+
+const savePendingResumeToStorage = async (
+  resumeData: any,
+  resumeFile: File
+) => {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      PENDING_RESUME_DATA_KEY,
+      JSON.stringify(resumeData)
+    );
+    const dataUrl = await fileToDataUrl(resumeFile);
+    sessionStorage.setItem(
+      PENDING_RESUME_FILE_KEY,
+      JSON.stringify({
+        name: resumeFile.name,
+        type: resumeFile.type,
+        dataUrl,
+      })
+    );
+  } catch (error) {
+    console.error("Failed to persist pending resume data", error);
+  }
+};
+
+const loadPendingResumeFromStorage = () => {
+  if (typeof window === "undefined") {
+    return {
+      data: null as any,
+      file: null as { name: string; type: string; dataUrl: string } | null,
+    };
+  }
+  try {
+    const storedData = sessionStorage.getItem(PENDING_RESUME_DATA_KEY);
+    const storedFile = sessionStorage.getItem(PENDING_RESUME_FILE_KEY);
+    return {
+      data: storedData ? JSON.parse(storedData) : null,
+      file: storedFile ? JSON.parse(storedFile) : null,
+    };
+  } catch (error) {
+    console.error("Failed to load pending resume data", error);
+    return {
+      data: null as any,
+      file: null as { name: string; type: string; dataUrl: string } | null,
+    };
+  }
+};
+
+const clearPendingResumeStorage = () => {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(PENDING_RESUME_DATA_KEY);
+  sessionStorage.removeItem(PENDING_RESUME_FILE_KEY);
+};
+
+const SAMPLE_MATCHED_STARTUPS = [
+  "Anthropic",
+  "Perplexity",
+  "Loom",
+  "Vercel",
+  "Linear",
+  "Superhuman",
+  "OpenAI",
+];
 
 export const Hero = () => {
   const router = useRouter();
