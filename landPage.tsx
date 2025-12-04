@@ -467,13 +467,13 @@ export const Hero = () => {
       setFile(selectedFile);
       setUploadedFile(selectedFile);
       void uploadResume(selectedFile);
-    } else {
-      toast({
-        title: "Invalid file type",
+      } else {
+        toast({
+          title: "Invalid file type",
         description: "Please upload a PDF or DOCX file",
-        variant: "destructive",
-      });
-    }
+          variant: "destructive",
+        });
+      }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -722,8 +722,8 @@ export const Hero = () => {
                 <button
                   onClick={() => setIsSignInModalOpen(true)}
                   className="text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
-                >
-                  Sign In
+        >
+          Sign In
                 </button>
                 <button
                   onClick={() => setIsSignUpModalOpen(true)}
@@ -803,8 +803,8 @@ export const Hero = () => {
                 style={{ border: 'none', borderWidth: 0, borderColor: 'transparent', boxShadow: 'none', outline: 'none' }}
               >
                 Maybe later
-              </Button>
-            </div>
+        </Button>
+      </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -831,7 +831,7 @@ export const Hero = () => {
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
               <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
                 Land Your Dream Job
-              </h1>
+            </h1>
               <p className="text-md md:text-xl text-white/80 max-w-2xl mx-auto">
                 Matches you with top startups, crafts personalized cold DMs, and saves you hours on professional outreach
               </p>
@@ -1075,6 +1075,6 @@ export const Hero = () => {
 
       {/* Footer Section */}
       <Footer />
-    </div>
+      </div>
   );
 };
