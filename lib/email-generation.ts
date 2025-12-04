@@ -120,7 +120,7 @@ export async function generateColdEmail(
   const model = genAI.getGenerativeModel({ model: DEFAULT_EMAIL_MODEL });
 
   const toneSnippet = toneToPromptSnippet(options.tone);
-  const maxWords = options.maxWords ?? 260;
+  const maxWords = options.maxWords ?? 100;
   const subjectPrefix = options.includeSubjectPrefix
     ? `[${options.includeSubjectPrefix}] `
     : '';
@@ -144,11 +144,11 @@ Write from the first‑person perspective of the candidate. The email should fee
 - Keep it casual and friendly, almost like you already know the founder a bit.
 - Avoid generic, over‑formal phrases like "I hope this email finds you well" or "To whom it may concern".
 - Reference specific details about the startup (industry, product, tags, description) so every startup gets a different, tailored email.
+- The subject line must write in this format: "Startup Name: Desired Role"
 
 Use a consistent structure across emails so they feel like they follow the same format:
 1) A short, direct opening that says who you are, the role you’d like (based on your background), and why you’re reaching out.
 2) 2–4 short bullet points or numbered points that call out your most relevant skills, experiences, or projects for THIS startup.
-3) A brief, eager closing with a clear but not pushy call to action (e.g. a quick intro chat or internship conversation) plus your name.
 
 Even when the candidate and startup profiles look similar, vary the exact wording, phrasing, and examples so that two different startups never receive the same email text.
 
