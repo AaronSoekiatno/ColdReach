@@ -12,6 +12,7 @@ import { HowItWorksJourney } from "@/components/HowItWorksJourney";
 import { SignInModal } from "@/components/SignInModal";
 import { SignUpModal } from "@/components/SignUpModal";
 import { ConnectGmailButton } from "@/components/ConnectGmailButton";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import {
   Dialog,
   DialogContent,
@@ -139,6 +140,8 @@ export const Hero = () => {
   const [showGmailConnectModal, setShowGmailConnectModal] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [hasCheckedGmail, setHasCheckedGmail] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [hiddenMatchCount, setHiddenMatchCount] = useState(0);
   const { toast } = useToast();
   const checkingGmailRef = useRef(false);
   const gmailCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -646,6 +649,15 @@ export const Hero = () => {
     };
   }, []);
 
+  // Reset hidden match count when premium modal is opened
+  // For landing page, we'll show premium features regardless of match count
+  useEffect(() => {
+    if (showPremiumModal) {
+      // Default to 0 for landing page - modal will still show all premium features
+      setHiddenMatchCount(0);
+    }
+  }, [showPremiumModal]);
+
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#0E1422' }}>
@@ -673,6 +685,12 @@ export const Hero = () => {
                 >
                   Your Matches
                 </Link>
+                <button
+                  onClick={() => setShowPremiumModal(true)}
+                  className="text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                >
+                  Premium
+                </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none">
@@ -1075,6 +1093,16 @@ export const Hero = () => {
 
       {/* Footer Section */}
       <Footer />
+
+      {/* Premium Modal */}
+      <UpgradeModal
+        open={showPremiumModal}
+        onOpenChange={setShowPremiumModal}
+        hiddenMatchCount={hiddenMatchCount}
+        email={user?.email || ''}
+        onDismiss={() => setShowPremiumModal(false)}
+        customTitle="Our Premium Plan"
+      />
       </div>
   );
 };

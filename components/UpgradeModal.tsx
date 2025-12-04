@@ -12,6 +12,7 @@ interface UpgradeModalProps {
   hiddenMatchCount: number;
   email: string;
   onDismiss?: () => void;
+  customTitle?: string;
 }
 
 const freeFeatures = [
@@ -28,7 +29,7 @@ const premiumFeatures = [
   "Priority support",
 ];
 
-export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDismiss }: UpgradeModalProps) {
+export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDismiss, customTitle }: UpgradeModalProps) {
   return (
     <DialogPrimitive.Root
       open={open}
@@ -53,7 +54,7 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
             {/* Header */}
             <div className="text-center">
               <DialogPrimitive.Title className="text-2xl font-bold text-white">
-                🔒 {hiddenMatchCount} More Match{hiddenMatchCount === 1 ? '' : 'es'} Available
+                {customTitle || `🔒 ${hiddenMatchCount} More Match${hiddenMatchCount === 1 ? '' : 'es'} Available`}
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="text-white/60 text-sm mt-2">
                 Upgrade to Premium to unlock all your matches and premium features
