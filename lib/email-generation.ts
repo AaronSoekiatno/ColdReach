@@ -152,7 +152,7 @@ Use a consistent structure across emails so they feel like they follow the same 
 3) keep each bullet point to a maximum of around 10-20 words. Be very concise.
 4) if the user sending out the email has any technical links, try to include them at the end of the email (github, portfolio, personal website)
 5) use a professional sign off at the end of the email (e.g. "Best regards, [Your Name]"), try to include contact information if they have it on their resume
-6) start the email with "Hi [Founder Name]," or an introduction that includesthe founder's name
+6) start the email with "Hi [Founder Name]," or an introduction that includes the founder's name
 
 Even when the candidate and startup profiles look similar, vary the exact wording, phrasing, and examples so that two different startups never receive the same email text.
 
