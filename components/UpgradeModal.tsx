@@ -106,7 +106,7 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
                 <div className="text-center mt-3">
                   <h3 className="text-xl font-bold text-white mb-1">Premium</h3>
                   <p className="text-white/60 text-xs mb-3">Unlock all features and unlimited matches</p>
-                  <div className="text-2xl font-bold text-white mb-1">$25</div>
+                  <div className="text-2xl font-bold text-white mb-1">$15</div>
                   <div className="text-white/60 text-xs mb-4">USD / month</div>
                 </div>
                 <div className="flex-1 space-y-2 mb-4">
