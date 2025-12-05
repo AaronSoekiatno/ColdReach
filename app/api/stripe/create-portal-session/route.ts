@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 /**
  * POST /api/stripe/create-portal-session
@@ -43,9 +43,29 @@ export async function POST(request: NextRequest) {
 
     const stripe = getStripe();
 
+    // Verify customer exists in Stripe
+    let customerId = candidate.stripe_customer_id;
+    try {
+      await stripe.customers.retrieve(customerId);
+    } catch (error: any) {
+      // Customer doesn't exist (deleted or invalid) - clear it from database
+      console.warn(`Stripe customer ${customerId} not found, clearing from database`);
+      if (supabaseAdmin) {
+        await supabaseAdmin
+          .from('candidates')
+          .update({ stripe_customer_id: null })
+          .eq('email', email);
+      }
+      
+      return NextResponse.json(
+        { error: 'No active subscription found' },
+        { status: 404 }
+      );
+    }
+
     // Create portal session
     const session = await stripe.billingPortal.sessions.create({
-      customer: candidate.stripe_customer_id,
+      customer: customerId,
       return_url: `${request.headers.get('origin')}/matches`,
     });
 

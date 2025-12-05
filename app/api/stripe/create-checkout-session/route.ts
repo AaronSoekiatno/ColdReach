@@ -71,8 +71,42 @@ export async function POST(request: NextRequest) {
 
     // Create or retrieve Stripe customer
     let customerId = candidate?.stripe_customer_id;
+    let customerExists = false;
 
-    if (!customerId) {
+    // If we have a customer ID, verify it still exists in Stripe
+    if (customerId) {
+      try {
+        const retrievedCustomer = await stripe.customers.retrieve(customerId);
+        // Check if customer was deleted (Stripe returns deleted customers with deleted: true)
+        if (retrievedCustomer.deleted) {
+          throw new Error('Customer was deleted');
+        }
+        customerExists = true;
+      } catch (error: any) {
+        // Customer doesn't exist (deleted or invalid) - check for any error code
+        const errorCode = error?.code || error?.type || 'unknown';
+        const isResourceMissing = errorCode === 'resource_missing' || 
+                                  error?.statusCode === 404 ||
+                                  error?.message?.includes('No such customer');
+        
+        if (isResourceMissing || error?.message?.includes('deleted')) {
+          customerId = null;
+          customerExists = false;
+          
+          // Clear the invalid customer ID from database
+          await supabaseAdmin
+            .from('candidates')
+            .update({ stripe_customer_id: null })
+            .eq('email', email);
+        } else {
+          // Unexpected error - rethrow it
+          throw error;
+        }
+      }
+    }
+
+    // Create new customer if we don't have a valid one
+    if (!customerId || !customerExists) {
       const customer = await stripe.customers.create({
         email,
         metadata: {
@@ -88,28 +122,81 @@ export async function POST(request: NextRequest) {
         .eq('email', email);
 
       if (updateError) {
-        console.error('Error saving Stripe customer ID:', updateError);
         throw new Error(`Failed to save customer ID: ${updateError.message}`);
       }
     }
 
+    // Final validation before creating checkout session
+    if (!customerId) {
+      throw new Error('Failed to obtain valid Stripe customer ID');
+    }
+
     // Create Checkout Session
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: STRIPE_PRICE_IDS.PREMIUM_MONTHLY,
-          quantity: 1,
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: STRIPE_PRICE_IDS.PREMIUM_MONTHLY,
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${request.headers.get('origin')}/matches?success=true`,
+        cancel_url: `${request.headers.get('origin')}/matches?canceled=true`,
+        metadata: {
+          candidate_email: email,
         },
-      ],
-      mode: 'subscription',
-      success_url: `${request.headers.get('origin')}/matches?success=true`,
-      cancel_url: `${request.headers.get('origin')}/matches?canceled=true`,
-      metadata: {
-        candidate_email: email,
-      },
-    });
+      });
+    } catch (checkoutError: any) {
+      // If checkout fails due to invalid customer, create a new customer and retry
+      if (checkoutError?.code === 'resource_missing' && 
+          checkoutError?.message?.includes('No such customer')) {
+        // Clear invalid customer ID from database
+        await supabaseAdmin
+          .from('candidates')
+          .update({ stripe_customer_id: null })
+          .eq('email', email);
+        
+        // Create new customer
+        const newCustomer = await stripe.customers.create({
+          email,
+          metadata: {
+            candidate_email: email,
+          },
+        });
+        customerId = newCustomer.id;
+        
+        // Update database
+        await supabaseAdmin
+          .from('candidates')
+          .update({ stripe_customer_id: customerId })
+          .eq('email', email);
+        
+        // Retry checkout session creation
+        session = await stripe.checkout.sessions.create({
+          customer: customerId,
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price: STRIPE_PRICE_IDS.PREMIUM_MONTHLY,
+              quantity: 1,
+            },
+          ],
+          mode: 'subscription',
+          success_url: `${request.headers.get('origin')}/matches?success=true`,
+          cancel_url: `${request.headers.get('origin')}/matches?canceled=true`,
+          metadata: {
+            candidate_email: email,
+          },
+        });
+      } else {
+        // Re-throw if it's a different error
+        throw checkoutError;
+      }
+    }
 
     return NextResponse.json({ sessionId: session.id, url: session.url });
   } catch (error: any) {

@@ -10,7 +10,7 @@ import {
   type ResumeProcessingResult,
 } from './utils';
 import { upsertCandidate, findMatchingStartups } from '@/lib/pinecone';
-import { saveCandidate, saveMatches, saveStartup, isSubscribed } from '@/lib/supabase';
+import { saveCandidate, saveMatches, saveStartup, isSubscribed, findStartupIdByName } from '@/lib/supabase';
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 
@@ -427,6 +427,11 @@ export async function POST(request: NextRequest) {
 
     if (isAuthenticated && accountEmail) {
       // Upload raw resume file to Supabase Storage (resumes bucket)
+      // We only want ONE resume file per user to avoid storage bloat.
+      // Strategy:
+      // 1. List any existing files in the user's resumes folder and delete them.
+      // 2. Upload the new resume to a deterministic path like `resumes/{userId}/resume.ext`
+      //    with upsert enabled, so the latest resume always replaces the previous one.
       let resumePath: string | undefined;
       try {
         const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -436,12 +441,42 @@ export async function POST(request: NextRequest) {
             serviceRoleKey
           );
 
-          const objectPath = `resumes/${user!.id}/${Date.now()}-${file!.name}`;
+          const userId = user!.id;
+          const folderPath = `resumes/${userId}`;
+
+          try {
+            // List and remove any existing files for this user to ensure only one resume is stored
+            const { data: existingFiles, error: listError } = await supabaseAdmin.storage
+              .from('resumes')
+              .list(folderPath, { limit: 100 });
+
+            if (listError) {
+              console.warn('Failed to list existing resume files for user; continuing anyway:', listError);
+            } else if (existingFiles && existingFiles.length > 0) {
+              const pathsToRemove = existingFiles.map((f) => `${folderPath}/${f.name}`);
+              const { error: removeError } = await supabaseAdmin.storage
+                .from('resumes')
+                .remove(pathsToRemove);
+              if (removeError) {
+                console.warn('Failed to remove existing resume files; continuing anyway:', removeError);
+              } else {
+                console.log(`Removed ${pathsToRemove.length} existing resume file(s) for user ${userId}`);
+              }
+            }
+          } catch (cleanupError) {
+            console.warn('Unexpected error while cleaning up existing resume files:', cleanupError);
+          }
+
+          // Derive a stable file name using the original extension if available
+          const originalName = file!.name || 'resume.pdf';
+          const ext = originalName.includes('.') ? originalName.split('.').pop() : 'pdf';
+          const safeExt = ext || 'pdf';
+          const objectPath = `${folderPath}/resume.${safeExt}`;
 
           const { error: uploadError } = await supabaseAdmin.storage
             .from('resumes')
             .upload(objectPath, buffer, {
-              contentType: file!.type,
+              contentType: file!.type || 'application/octet-stream',
               upsert: true,
             });
 
@@ -463,7 +498,8 @@ export async function POST(request: NextRequest) {
           accountEmail,
           embedding,
           {
-            name: accountName ?? extractionResult.name,
+            // Prioritize resume-extracted name over auth metadata
+            name: extractionResult.name || accountName || 'Unknown',
             email: accountEmail,
             summary: extractionResult.summary,
             skills: extractionResult.skills.join(', '),
@@ -496,7 +532,8 @@ export async function POST(request: NextRequest) {
       try {
         const savedCandidate = await saveCandidate({
           email: accountEmail,
-          name: accountName ?? extractionResult.name,
+          // Prioritize resume-extracted name over auth metadata
+          name: extractionResult.name || accountName || 'Unknown',
           summary: extractionResult.summary,
           skills: extractionResult.skills.join(', '),
           location: extractionResult.location,
@@ -579,41 +616,68 @@ export async function POST(request: NextRequest) {
       // Save matches to Supabase - only if authenticated and we have a candidate ID
       if (matches.length > 0 && isAuthenticated && candidateId) {
         try {
-          // First, ensure all matched startups exist in Supabase
-          // This prevents foreign key constraint violations
-          console.log(`Syncing ${matches.length} matched startups to Supabase...`);
+          // Map Pinecone matches to Supabase startup IDs
+          // This ensures we use existing Supabase data (with founder emails) instead of creating duplicates
+          console.log(`Mapping ${matches.length} matched startups to Supabase IDs...`);
+          const matchMappings: Array<{ startup_id: string; score: number }> = [];
+
           for (const match of matches) {
             try {
-              await saveStartup({
-                id: match.id,
-                name: match.metadata.name || 'Unknown',
-                industry: match.metadata.industry || '',
-                description: match.metadata.description || '',
-                funding_stage: match.metadata.funding_stage || '',
-                funding_amount: match.metadata.funding_amount || '',
-                location: match.metadata.location || '',
-                website: match.metadata.website || '',
-                tags: match.metadata.tags || '',
-              });
+              const startupName = match.metadata.name || 'Unknown';
+              
+              // First, try to find existing startup in Supabase by name (case-insensitive)
+              // This ensures we use the canonical Supabase startup with founder emails
+              let supabaseStartupId = await findStartupIdByName(startupName);
+
+              if (supabaseStartupId) {
+                // Startup exists in Supabase - use that ID
+                console.log(`  ✓ Found existing startup "${startupName}" in Supabase (ID: ${supabaseStartupId})`);
+                matchMappings.push({
+                  startup_id: supabaseStartupId,
+                  score: match.score,
+                });
+              } else {
+                // Startup doesn't exist in Supabase - create it using Pinecone data
+                // This should rarely happen if all startups were ingested from CSV
+                console.log(`  ⚠ Startup "${startupName}" not found in Supabase, creating new entry...`);
+                await saveStartup({
+                  id: match.id, // Use Pinecone ID for new startups
+                  name: startupName,
+                  industry: match.metadata.industry || '',
+                  description: match.metadata.description || '',
+                  funding_stage: match.metadata.funding_stage || '',
+                  funding_amount: match.metadata.funding_amount || '',
+                  location: match.metadata.location || '',
+                  website: match.metadata.website || '',
+                  tags: match.metadata.tags || '',
+                });
+                matchMappings.push({
+                  startup_id: match.id,
+                  score: match.score,
+                });
+              }
             } catch (error) {
-              console.warn(`Failed to sync startup ${match.id} to Supabase:`, error instanceof Error ? error.message : 'Unknown error');
+              console.warn(`Failed to process startup "${match.metadata.name}":`, error instanceof Error ? error.message : 'Unknown error');
               // Continue with other startups even if one fails
             }
           }
 
-          // Now save the matches (foreign keys should be valid now)
-          // For free users, only save the top 1 match
-          const isPremium = isSubscribed({ subscription_tier: subscriptionTier, subscription_status: subscriptionStatus });
-          const matchesToSave = isPremium ? matches : matches.slice(0, 1);
-
+          // Now save the matches using Supabase startup IDs
+          // Always save all quality matches so the UI can upsell based on hidden matches.
+          // Free users will still only SEE the first match in the UI, but additional
+          // matches are stored and counted for the Premium upgrade modal.
           await saveMatches(
             candidateId, // Use UUID instead of email
-            matchesToSave.map((match) => ({
-              startup_id: match.id,
-              score: match.score,
-            }))
+            matchMappings
           );
-          console.log(`✓ Successfully saved ${matchesToSave.length} matches to Supabase for candidate ${candidateId}${isPremium ? '' : ' (Free tier - limited to 1 match)'}`);
+          const isPremium = isSubscribed({ subscription_tier: subscriptionTier, subscription_status: subscriptionStatus });
+          console.log(
+            `✓ Successfully saved ${matches.length} matches to Supabase for candidate ${candidateId}${
+              isPremium
+                ? ''
+                : ' (Free tier - UI will show 1 match, additional matches are locked behind Premium)'
+            }`
+          );
         } catch (error) {
           console.error('✗ Failed to save matches to Supabase:', {
             error: error instanceof Error ? error.message : 'Unknown error',

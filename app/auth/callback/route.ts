@@ -43,8 +43,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/?error=auth_failed', origin));
     }
 
+    // Check if this is a new user by checking if they have a candidate record
+    const { data: { user } } = await supabase.auth.getUser();
+    let isNewSignUp = false;
+    
+    if (user?.email) {
+      // Check if user has a candidate record
+      const { data: candidate } = await supabase
+        .from('candidates')
+        .select('id')
+        .eq('email', user.email)
+        .single();
+      
+      // If no candidate record exists, this is likely a new sign-up
+      isNewSignUp = !candidate;
+    }
+
     // Redirect to home page after successful authentication
-    return NextResponse.redirect(new URL('/', origin));
+    // Add new_signup parameter to trigger Gmail connection modal
+    const redirectUrl = new URL('/', origin);
+    if (isNewSignUp) {
+      redirectUrl.searchParams.set('new_signup', 'true');
+    }
+    return NextResponse.redirect(redirectUrl);
   }
 
   // Handle magic link callback (email sign-in/sign-up)

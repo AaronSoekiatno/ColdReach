@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Upload, FileText, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Features } from "@/components/Features";
 import { StartupsCarousel } from "@/components/StartupsCarousel";
@@ -11,7 +12,7 @@ import { HowItWorksJourney } from "@/components/HowItWorksJourney";
 import { SignInModal } from "@/components/SignInModal";
 import { SignUpModal } from "@/components/SignUpModal";
 import { ConnectGmailButton } from "@/components/ConnectGmailButton";
-import { WaitlistModal } from "@/components/WaitlistModal";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,16 @@ import logo from "./images/hermeslogo.png";
 
 const PENDING_RESUME_DATA_KEY = "pendingResumeData";
 const PENDING_RESUME_FILE_KEY = "pendingResumeFile";
+
+const SAMPLE_MATCHED_STARTUPS = [
+  "Anthropic",
+  "Perplexity",
+  "Loom",
+  "Vercel",
+  "Linear",
+  "Superhuman",
+  "OpenAI",
+];
 
 const fileToDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -109,17 +120,28 @@ const clearPendingResumeStorage = () => {
 export const Hero = () => {
   const router = useRouter();
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
   const [showSavingModal, setShowSavingModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [matchedStartups, setMatchedStartups] = useState<string[]>([]);
+  const [matchCount, setMatchCount] = useState<number>(0);
   const [pendingResumeData, setPendingResumeData] = useState<any>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reuploadInProgress = useRef(false);
-  
+
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isSignUpModalOpen, setIsSignUpModalOpen] = useState(false);
-  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [showGmailConnectModal, setShowGmailConnectModal] = useState(false);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [hasCheckedGmail, setHasCheckedGmail] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [hiddenMatchCount, setHiddenMatchCount] = useState(0);
   const { toast } = useToast();
   const checkingGmailRef = useRef(false);
   const gmailCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -136,6 +158,7 @@ export const Hero = () => {
       dataUrlToFile(storedFile.dataUrl, storedFile.name, storedFile.type)
         .then((restoredFile) => {
           setUploadedFile(restoredFile);
+          setFile(restoredFile);
         })
         .catch((error) => {
           console.error("Failed to restore pending resume file", error);
@@ -235,6 +258,14 @@ export const Hero = () => {
           description: "You can now send emails directly from your account.",
         });
       }
+
+      // Check if this is a new sign-up and trigger Gmail connection check
+      if (urlParams.get('new_signup') === 'true' && currentUser) {
+        // Small delay to ensure state is ready
+        setTimeout(() => {
+          void checkGmailConnection(currentUser, true);
+        }, 1000);
+      }
       
       // Check if user needs to sign in to connect Gmail
       if (urlParams.get('error') === 'please_sign_in' && urlParams.get('action') === 'connect_gmail') {
@@ -268,6 +299,15 @@ export const Hero = () => {
           // User changed - reset check state for new user
           setHasCheckedGmail(false);
           lastCheckedUserRef.current = newUser.email;
+          
+          // Check if this is a new sign-up by checking URL params or checking if user has candidate record
+          const urlParams = new URLSearchParams(window.location.search);
+          const isNewSignUp = urlParams.get('new_signup') === 'true' || urlParams.get('code') !== null;
+          
+          // Check Gmail connection immediately for new sign-ups, with a small delay to ensure state is ready
+          setTimeout(() => {
+            void checkGmailConnection(newUser, isNewSignUp);
+          }, 500);
         }
         // If same user, keep hasCheckedGmail as is to prevent duplicate checks
       }
@@ -338,116 +378,312 @@ export const Hero = () => {
     }
   }, [user, pendingResumeData, uploadedFile, reuploadPendingResume, router]);
 
-  // Check Gmail connection status
-  // DISABLED: Gmail connect functionality temporarily hidden
-  const checkGmailConnection = async (currentUser?: User | null) => {
-    // Function disabled - Gmail connect functionality temporarily hidden
-    return;
-    
-    // const activeUser = currentUser ?? user;
-
-    // if (!activeUser) {
-    //   setHasCheckedGmail(false);
-    //   checkingGmailRef.current = false;
-    //   return;
-    // }
-
-    // // Prevent duplicate checks
-    // if (checkingGmailRef.current) {
-    //   return;
-    // }
-
-    // // Don't check if modal is already showing or Gmail is already connected
-    // if (showGmailConnectModal || gmailConnected) {
-    //   setHasCheckedGmail(true);
-    //   checkingGmailRef.current = false;
-    //   return;
-    // }
-
-    // checkingGmailRef.current = true;
-
-    // // Clear any existing timeout and reset scheduled flag
-    // if (gmailCheckTimeoutRef.current) {
-    //   clearTimeout(gmailCheckTimeoutRef.current);
-    //   gmailCheckTimeoutRef.current = null;
-    // }
-    // modalScheduledRef.current = false;
-
-    // try {
-    //   const response = await fetch('/api/auth/gmail/status', {
-    //     credentials: 'include',
-    //   });
-
-    //   console.log('[Gmail Status][client] Response status:', response.status);
-
-    //   if (response.ok) {
-    //     const data = await response.json();
-    //     console.log('[Gmail Status][client] Response JSON:', data);
-
-    //     // Treat any existing connection as "connected" even if the access token is expired.
-    //     // Expiration is handled server-side by refreshing the token when sending emails.
-    //     const connected = data.connected === true;
-    //     setGmailConnected(connected);
-
-    //     // Only prompt to connect if there is truly no connection row
-    //     if (!connected && !modalScheduledRef.current) {
-    //       modalScheduledRef.current = true;
-    //       gmailCheckTimeoutRef.current = setTimeout(() => {
-    //         setShowGmailConnectModal((prev) => {
-    //           // Only show if not already showing
-    //           if (!prev) {
-    //             return true;
-    //           }
-    //           return prev;
-    //         });
-    //         gmailCheckTimeoutRef.current = null;
-    //         modalScheduledRef.current = false;
-    //       }, 1500);
-    //     }
-    //   } else {
-    //     setGmailConnected(false);
-    //     // Schedule modal if not already scheduled
-    //     if (!modalScheduledRef.current) {
-    //       modalScheduledRef.current = true;
-    //       gmailCheckTimeoutRef.current = setTimeout(() => {
-    //         setShowGmailConnectModal((prev) => {
-    //           if (!prev) {
-    //             return true;
-    //           }
-    //           return prev;
-    //         });
-    //         gmailCheckTimeoutRef.current = null;
-    //         modalScheduledRef.current = false;
-    //       }, 1500);
-    //     }
-    //   }
-    // } catch (error) {
-    //   console.error('Failed to check Gmail connection:', error);
-    //   setGmailConnected(false);
-    //   // Schedule modal if not already scheduled
-    //   if (!modalScheduledRef.current) {
-    //     modalScheduledRef.current = true;
-    //     gmailCheckTimeoutRef.current = setTimeout(() => {
-    //       setShowGmailConnectModal((prev) => {
-    //         if (!prev) {
-    //           return true;
-    //         }
-    //         return prev;
-    //       });
-    //       gmailCheckTimeoutRef.current = null;
-    //       modalScheduledRef.current = false;
-    //     }
-    //   }
-    // } finally {
-    //   setHasCheckedGmail(true);
-    //   checkingGmailRef.current = false;
-    // }
+  const startProgressSimulation = () => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+    setUploadProgress(0);
+    progressIntervalRef.current = setInterval(() => {
+      setUploadProgress((prev) => {
+        const next = prev + Math.random() * 10;
+        return next >= 95 ? 95 : next;
+      });
+    }, 60);
   };
 
-  // Check Gmail connection when user is available
+  const stopProgressSimulation = () => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+  };
+
+  const simulateMatches = () => {
+    const shuffled = [...SAMPLE_MATCHED_STARTUPS].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 3);
+  };
+
+  const uploadResume = async (resume: File) => {
+    setIsUploading(true);
+    setShowProgressModal(true);
+    setUploadProgress(5);
+    startProgressSimulation();
+
+    const formData = new FormData();
+    formData.append("resume", resume);
+
+    try {
+      const response = await fetch("/api/upload-resume", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Failed to process your resume");
+      }
+
+      stopProgressSimulation();
+      setUploadProgress(100);
+
+      const data = await response.json();
+      const matches = data.matches || [];
+      const count = matches.length;
+      setMatchCount(count);
+      setMatchedStartups(simulateMatches());
+
+      const resumePayload = {
+        ...data,
+        savedToDatabase: data.savedToDatabase || false,
+      };
+
+      setPendingResumeData(resumePayload);
+      setUploadedFile(resume);
+
+      if (resumePayload.savedToDatabase) {
+        clearPendingResumeStorage();
+      } else {
+        await savePendingResumeToStorage(resumePayload, resume);
+      }
+
+      // Check if user is authenticated
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+      setTimeout(() => {
+        setShowProgressModal(false);
+        if (currentUser) {
+          // User is authenticated - show results modal
+          setShowResultsModal(true);
+          toast({
+            title: "Resume processed",
+            description: `We found ${count} startup${count !== 1 ? "s" : ""} that look like a great fit.`,
+          });
+        } else {
+          // User is not authenticated - show sign-up modal directly
+          setIsSignUpModalOpen(true);
+          toast({
+            title: "Resume processed",
+            description: `We found ${count} startup${count !== 1 ? "s" : ""} that look like a great fit. Sign up to view them!`,
+          });
+        }
+        setFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }, 500);
+    } catch (error) {
+      stopProgressSimulation();
+      setShowProgressModal(false);
+      toast({
+        title: "Upload failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "We couldn't process your resume. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const validateAndProcessFile = (selectedFile: File) => {
+    const isPdf =
+      selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf");
+    const isDocx =
+      selectedFile.type ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      selectedFile.name.toLowerCase().endsWith(".docx");
+
+    if (isPdf || isDocx) {
+      setFile(selectedFile);
+      setUploadedFile(selectedFile);
+      void uploadResume(selectedFile);
+      } else {
+        toast({
+          title: "Invalid file type",
+        description: "Please upload a PDF or DOCX file",
+          variant: "destructive",
+        });
+      }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      validateAndProcessFile(selectedFile);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) {
+      validateAndProcessFile(droppedFile);
+    }
+  };
+
+  const handleRemoveFile = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFile(null);
+    setUploadedFile(null);
+    setPendingResumeData(null);
+    clearPendingResumeStorage();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  // Check Gmail connection status
+  const checkGmailConnection = async (currentUser?: User | null, showImmediately = false) => {
+    const activeUser = currentUser ?? user;
+
+    if (!activeUser) {
+      setHasCheckedGmail(false);
+      checkingGmailRef.current = false;
+      return;
+    }
+
+    // Prevent duplicate checks
+    if (checkingGmailRef.current) {
+      return;
+    }
+
+    // Don't check if modal is already showing or Gmail is already connected
+    if (showGmailConnectModal || gmailConnected) {
+      setHasCheckedGmail(true);
+      checkingGmailRef.current = false;
+      return;
+    }
+
+    checkingGmailRef.current = true;
+
+    // Clear any existing timeout and reset scheduled flag
+    if (gmailCheckTimeoutRef.current) {
+      clearTimeout(gmailCheckTimeoutRef.current);
+      gmailCheckTimeoutRef.current = null;
+    }
+    modalScheduledRef.current = false;
+
+    try {
+      const response = await fetch('/api/auth/gmail/status', {
+        credentials: 'include',
+      });
+
+      console.log('[Gmail Status][client] Response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Gmail Status][client] Response JSON:', data);
+
+        // Treat any existing connection as "connected" even if the access token is expired.
+        // Expiration is handled server-side by refreshing the token when sending emails.
+        const connected = data.connected === true;
+        setGmailConnected(connected);
+
+        // Only prompt to connect if there is truly no connection row
+        if (!connected && !modalScheduledRef.current) {
+          modalScheduledRef.current = true;
+          if (showImmediately) {
+            // Show immediately for new sign-ups
+            setShowGmailConnectModal(true);
+            modalScheduledRef.current = false;
+          } else {
+            // Delay for existing users
+            gmailCheckTimeoutRef.current = setTimeout(() => {
+              setShowGmailConnectModal((prev) => {
+                // Only show if not already showing
+                if (!prev) {
+                  return true;
+                }
+                return prev;
+              });
+              gmailCheckTimeoutRef.current = null;
+              modalScheduledRef.current = false;
+            }, 1500);
+          }
+        }
+      } else {
+        setGmailConnected(false);
+        // Schedule modal if not already scheduled
+        if (!modalScheduledRef.current) {
+          modalScheduledRef.current = true;
+          if (showImmediately) {
+            setShowGmailConnectModal(true);
+            modalScheduledRef.current = false;
+          } else {
+            gmailCheckTimeoutRef.current = setTimeout(() => {
+              setShowGmailConnectModal((prev) => {
+                if (!prev) {
+                  return true;
+                }
+                return prev;
+              });
+              gmailCheckTimeoutRef.current = null;
+              modalScheduledRef.current = false;
+            }, 1500);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check Gmail connection:', error);
+      setGmailConnected(false);
+      // Schedule modal if not already scheduled
+      if (!modalScheduledRef.current) {
+        modalScheduledRef.current = true;
+        if (showImmediately) {
+          setShowGmailConnectModal(true);
+          modalScheduledRef.current = false;
+        } else {
+          gmailCheckTimeoutRef.current = setTimeout(() => {
+            setShowGmailConnectModal((prev) => {
+              if (!prev) {
+                return true;
+              }
+              return prev;
+            });
+            gmailCheckTimeoutRef.current = null;
+            modalScheduledRef.current = false;
+          }, 1500);
+        }
+      }
+    } finally {
+      setHasCheckedGmail(true);
+      checkingGmailRef.current = false;
+    }
+  };
+
+  // Check Gmail connection when user is available (only if not already checked via auth state change)
   useEffect(() => {
+    // Only auto-check if user exists, hasn't been checked, modal isn't showing, Gmail isn't connected, and we're not currently checking
+    // This is a fallback for cases where auth state change didn't trigger the check
     if (user && !hasCheckedGmail && !showGmailConnectModal && !gmailConnected && !checkingGmailRef.current) {
-      void checkGmailConnection();
+      // Check URL params first to see if this is a new sign-up
+      const urlParams = new URLSearchParams(window.location.search);
+      const isNewSignUp = urlParams.get('new_signup') === 'true';
+      void checkGmailConnection(user, isNewSignUp);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, hasCheckedGmail]);
@@ -461,14 +697,23 @@ export const Hero = () => {
     };
   }, []);
 
+  // Reset hidden match count when premium modal is opened
+  // For landing page, we'll show premium features regardless of match count
+  useEffect(() => {
+    if (showPremiumModal) {
+      // Default to 0 for landing page - modal will still show all premium features
+      setHiddenMatchCount(0);
+    }
+  }, [showPremiumModal]);
+
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-gray-800">
+    <div className="min-h-screen" style={{ backgroundColor: '#0E1422' }}>
       {/* Sticky Header */}
-      <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/10 border-b border-white/20">
-        <div className="container mx-auto px-8 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-50 w-full pt-2" style={{ backgroundColor: '#0E1422' }}>
+        <div className="container mx-auto px-16 py-4 flex items-center justify-between">
           {/* Logo and Title */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-2">
             <Image
               src={logo}
               alt="Hermes logo"
@@ -479,7 +724,7 @@ export const Hero = () => {
           </Link>
 
           {/* Sign In Button / Account Indicator */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
             {user ? (
               <>
                 <Link
@@ -488,6 +733,18 @@ export const Hero = () => {
                 >
                   Your Matches
                 </Link>
+                <Link
+                  href="/history"
+                  className="text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                >
+                  History
+                </Link>
+                <button
+                  onClick={() => setShowPremiumModal(true)}
+                  className="text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                >
+                  Premium
+                </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none">
@@ -533,18 +790,18 @@ export const Hero = () => {
                 </DropdownMenu>
               </>
             ) : (
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setIsSignInModalOpen(true)}
-                  className="text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
-                >
-                  Sign In
-                </button>
+              <div className="flex items-center gap-5">
                 <button
                   onClick={() => setIsSignUpModalOpen(true)}
-                  className="text-sm font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+                  className="text-sm font-semibold text-white transition-all border border-transparent bg-white/10 rounded-2xl px-5 py-2 hover:bg-white/20 focus:outline-none"
                 >
-                  Sign Up
+                  Sign up
+                </button>
+                <button
+                  onClick={() => setIsSignInModalOpen(true)}
+                  className="text-sm font-semibold text-white transition-opacity hover:opacity-70 focus:outline-none"
+                >
+                  Log in
                 </button>
               </div>
             )}
@@ -618,8 +875,8 @@ export const Hero = () => {
                 style={{ border: 'none', borderWidth: 0, borderColor: 'transparent', boxShadow: 'none', outline: 'none' }}
               >
                 Maybe later
-              </Button>
-            </div>
+        </Button>
+      </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -636,31 +893,28 @@ export const Hero = () => {
         <SignUpModal 
           open={isSignUpModalOpen} 
           onOpenChange={setIsSignUpModalOpen}
-          fromReview={false}
+          fromReview={pendingResumeData !== null && !pendingResumeData.savedToDatabase}
           onSwitchToSignIn={() => setIsSignInModalOpen(true)}
         />
 
-        {/* Waitlist Modal */}
-        <WaitlistModal 
-          open={showWaitlistModal} 
-          onOpenChange={setShowWaitlistModal} 
-        />
-
       {/* Content */}
-      <div className="container relative z-10 px-4 py-20">
+      <div className="container relative z-10 px-4 pb-36">
         <div className="max-w-4xl mx-auto text-center space-y-12">
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-1000">
               <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
                 Land Your Dream Job
-              </h1>
+            </h1>
               <p className="text-md md:text-xl text-white/80 max-w-2xl mx-auto">
                 Matches you with top startups, crafts personalized cold DMs, and saves you hours on professional outreach
               </p>
               <Button
-                onClick={() => setShowWaitlistModal(true)}
+                onClick={() => {
+                  const uploadSection = document.getElementById('resume-upload-section');
+                  uploadSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
                 className="mt-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-400 hover:to-blue-500 px-8 py-6 text-lg font-semibold rounded-xl transition-all hover:scale-105"
               >
-                Join the Waitlist
+                Get Your Internship
               </Button>
           </div>
         </div>
@@ -696,8 +950,8 @@ export const Hero = () => {
       {/* Features Section */}
       <Features />
 
-      {/* Resume Upload Section - Hidden */}
-      {/* <section className="py-20 bg-gradient-to-br from-black via-gray-900 to-gray-800">
+      {/* Resume Upload Section */}
+      <section className="py-20 bg-gradient-to-br from-black via-gray-900 to-gray-800">
         <div className="container mx-auto px-4">
           <div className="max-w-md mx-auto">
             <div id="resume-upload-section" className="animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
@@ -762,10 +1016,153 @@ export const Hero = () => {
             </div>
           </div>
         </div>
-      </section> */}
+      </section>
+
+      {/* Upload Progress Modal */}
+      <Dialog open={showProgressModal} onOpenChange={() => {}}>
+        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-semibold text-white text-center">
+              Creating Your Matches
+            </DialogTitle>
+            <DialogDescription className="text-white/60 text-center">
+              Hang tight while we work our magic
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 mt-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 10 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                  {uploadProgress > 10 ? '✓' : '1'}
+                </div>
+                <span className={`text-sm ${uploadProgress > 10 ? 'text-white' : 'text-white/60'}`}>
+                  Analyzing your resume...
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 40 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                  {uploadProgress > 40 ? '✓' : '2'}
+                </div>
+                <span className={`text-sm ${uploadProgress > 40 ? 'text-white' : 'text-white/60'}`}>
+                  Finding aligned startups...
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress > 70 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                  {uploadProgress > 70 ? '✓' : '3'}
+                </div>
+                <span className={`text-sm ${uploadProgress > 70 ? 'text-white' : 'text-white/60'}`}>
+                  Preparing personalized messages...
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${uploadProgress >= 100 ? 'bg-green-500 text-white' : 'bg-white/20 text-white/60'}`}>
+                  {uploadProgress >= 100 ? '✓' : '4'}
+                </div>
+                  <span className={`text-sm ${uploadProgress >= 100 ? 'text-white' : 'text-white/60'}`}>
+                    Ready to review your matches!
+                  </span>
+              </div>
+            </div>
+            <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-200"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+            <p className="text-center text-white/70 text-sm">
+              {Math.round(uploadProgress)}% complete
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Results Modal */}
+      <Dialog open={showResultsModal} onOpenChange={setShowResultsModal}>
+        <DialogContent className="bg-black border-white/20 text-white sm:max-w-md text-center space-y-6">
+          <DialogHeader>
+            <DialogTitle className="text-3xl font-semibold text-white">
+              Your Matches Are Ready!
+            </DialogTitle>
+            <DialogDescription className="text-lg text-white">
+              Congrats! We found {matchCount} startup{matchCount !== 1 ? 's' : ''} for you and have crafted personalized messages for each of them.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-white/5 rounded-2xl p-4 space-y-2 text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
+              <span className="text-sm text-white">{matchCount} perfect-fit startup{matchCount !== 1 ? 's' : ''} matched</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
+              <span className="text-sm text-white">Personalized cold DMs ready to send</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-xs">→</div>
+              <span className="text-sm text-white/80">Connect Gmail to automate outreach</span>
+            </div>
+          </div>
+          <Button
+            className="w-full bg-white text-black hover:bg-white/90"
+            onClick={async () => {
+              setShowResultsModal(false);
+              const { data: { user: currentUser } } = await supabase.auth.getUser();
+              if (!currentUser) {
+                // This shouldn't happen since we check auth before showing this modal,
+                // but handle it just in case
+                setIsSignUpModalOpen(true);
+                return;
+              }
+              
+              // User is authenticated - save resume if needed and redirect
+              if (pendingResumeData && !pendingResumeData.savedToDatabase && uploadedFile) {
+                try {
+                  const formData = new FormData();
+                  formData.append("resume", uploadedFile);
+                  const saveResponse = await fetch("/api/upload-resume", {
+                    method: "POST",
+                    body: formData,
+                    credentials: "include",
+                  });
+                  if (saveResponse.ok) {
+                    toast({
+                      title: "Resume saved",
+                      description: "Your matches are ready to view.",
+                    });
+                    setPendingResumeData(null);
+                    setUploadedFile(null);
+                  } else {
+                    throw new Error("Failed to save resume");
+                  }
+                } catch (error) {
+                  toast({
+                    title: "Error",
+                    description: "Failed to save your resume. Please try uploading again.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+              }
+              window.location.href = '/matches';
+            }}
+          >
+            Review Your Matches
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       {/* Footer Section */}
       <Footer />
-    </div>
+
+      {/* Premium Modal */}
+      <UpgradeModal
+        open={showPremiumModal}
+        onOpenChange={setShowPremiumModal}
+        hiddenMatchCount={hiddenMatchCount}
+        email={user?.email || ''}
+        onDismiss={() => setShowPremiumModal(false)}
+        customTitle="Our Premium Plan"
+      />
+      </div>
   );
 };

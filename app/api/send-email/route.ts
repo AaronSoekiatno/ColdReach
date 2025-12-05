@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { generateColdEmail } from '@/lib/email-generation';
 import { getCandidate, getStartup } from '@/lib/supabase';
 import { guessFounderEmailFromStartup } from '@/lib/founder-email';
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { startupId, matchScore } = await request.json();
+    const { startupId, matchScore, subject: customSubject, body: customBody } = await request.json();
 
     if (!startupId || matchScore === undefined) {
       return NextResponse.json(
@@ -90,34 +91,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate email
-    const generatedEmail = await generateColdEmail(
-      {
-        name: candidate.name,
-        email: candidate.email,
-        summary: candidate.summary,
-        // Split skills string into non-empty, trimmed values
-        skills: candidate.skills
-          .split(', ')
-          .map((s: string) => s.trim())
-          .filter((s: string) => s.length > 0),
-      },
-      {
-        name: startup.name,
-        industry: startup.industry,
-        description: startup.description,
-        fundingStage: startup.funding_stage,
-        fundingAmount: startup.funding_amount,
-        location: startup.location,
-        website: startup.website,
-        // Split tags string into non-empty, trimmed values
-        tags: startup.tags
-          ?.split(', ')
-          .map((t: string) => t.trim())
-          .filter((t: string) => t.length > 0),
-      },
-      { score: matchScore }
-    );
+    // Use custom subject/body if provided, otherwise generate email
+    let emailSubject: string;
+    let emailBody: string;
+    
+    if (customSubject && customBody) {
+      // User edited the email - use their custom version
+      emailSubject = customSubject;
+      emailBody = customBody;
+    } else {
+      // Generate email as before
+      const generatedEmail = await generateColdEmail(
+        {
+          name: candidate.name,
+          email: candidate.email,
+          summary: candidate.summary,
+          // Split skills string into non-empty, trimmed values
+          skills: candidate.skills
+            .split(', ')
+            .map((s: string) => s.trim())
+            .filter((s: string) => s.length > 0),
+        },
+        {
+          name: startup.name,
+          industry: startup.industry,
+          description: startup.description,
+          fundingStage: startup.funding_stage,
+          fundingAmount: startup.funding_amount,
+          location: startup.location,
+          website: startup.website,
+          // Split tags string into non-empty, trimmed values
+          tags: startup.tags
+            ?.split(', ')
+            .map((t: string) => t.trim())
+            .filter((t: string) => t.length > 0),
+        },
+        { score: matchScore }
+      );
+      emailSubject = generatedEmail.subject;
+      emailBody = generatedEmail.body;
+    }
 
     // Set up OAuth client with stored tokens
     oauth2Client.setCredentials({
@@ -153,14 +166,89 @@ export async function POST(request: NextRequest) {
     // Send email via Gmail API
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
-    // Create email message
-    const message = [
-      `To: ${targetEmail}`,
-      `Subject: ${generatedEmail.subject}`,
-      'Content-Type: text/plain; charset=utf-8',
-      '',
-      generatedEmail.body,
-    ].join('\n');
+    // Download resume from Supabase Storage if available
+    let resumeAttachment: { data: Buffer; filename: string; mimeType: string } | null = null;
+    if (candidate.resume_path) {
+      try {
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (serviceRoleKey) {
+          const supabaseAdmin = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            serviceRoleKey
+          );
+
+          const { data: resumeData, error: downloadError } = await supabaseAdmin.storage
+            .from('resumes')
+            .download(candidate.resume_path);
+
+          if (!downloadError && resumeData) {
+            const arrayBuffer = await resumeData.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            
+            // Determine filename and MIME type from path
+            const pathParts = candidate.resume_path.split('/');
+            const filename = pathParts[pathParts.length - 1] || 'resume.pdf';
+            const mimeType = filename.endsWith('.pdf') 
+              ? 'application/pdf' 
+              : filename.endsWith('.docx')
+              ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              : 'application/octet-stream';
+
+            resumeAttachment = {
+              data: buffer,
+              filename,
+              mimeType,
+            };
+            console.log(`Resume attachment prepared: ${filename} (${buffer.length} bytes)`);
+          } else {
+            console.warn('Failed to download resume from Storage:', downloadError);
+          }
+        }
+      } catch (error) {
+        console.warn('Error downloading resume for attachment:', error);
+        // Continue without attachment if download fails
+      }
+    }
+
+    // Create email message with optional attachment
+    let message: string;
+    
+    if (resumeAttachment) {
+      // Multipart message with attachment
+      const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      const attachmentBase64 = resumeAttachment.data.toString('base64');
+      const attachmentEncoded = attachmentBase64.match(/.{1,76}/g)?.join('\n') || attachmentBase64;
+
+      message = [
+        `To: ${targetEmail}`,
+        `Subject: ${emailSubject}`,
+        `MIME-Version: 1.0`,
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+        '',
+        `--${boundary}`,
+        `Content-Type: text/plain; charset=utf-8`,
+        `Content-Transfer-Encoding: 7bit`,
+        '',
+        emailBody,
+        '',
+        `--${boundary}`,
+        `Content-Type: ${resumeAttachment.mimeType}; name="${resumeAttachment.filename}"`,
+        `Content-Disposition: attachment; filename="${resumeAttachment.filename}"`,
+        `Content-Transfer-Encoding: base64`,
+        '',
+        attachmentEncoded,
+        `--${boundary}--`,
+      ].join('\n');
+    } else {
+      // Simple text message without attachment
+      message = [
+        `To: ${targetEmail}`,
+        `Subject: ${emailSubject}`,
+        'Content-Type: text/plain; charset=utf-8',
+        '',
+        emailBody,
+      ].join('\n');
+    }
 
     const encodedMessage = Buffer.from(message)
       .toString('base64')
@@ -174,6 +262,40 @@ export async function POST(request: NextRequest) {
         raw: encodedMessage,
       },
     });
+
+    // Save email history to database
+    try {
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (serviceRoleKey && candidate.id) {
+        const supabaseAdmin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          serviceRoleKey
+        );
+
+        // Get recipient name (founder name if available)
+        const recipientName = startup.founder_first_name && startup.founder_last_name
+          ? `${startup.founder_first_name} ${startup.founder_last_name}`
+          : startup.founder_first_name || startup.founder_last_name || null;
+
+        await supabaseAdmin
+          .from('sent_emails')
+          .insert({
+            candidate_id: candidate.id,
+            startup_id: startup.id,
+            recipient_email: targetEmail,
+            recipient_name: recipientName,
+            subject: emailSubject,
+            body: emailBody,
+            match_score: matchScore,
+            sent_at: new Date().toISOString(),
+          });
+
+        console.log('Email history saved successfully');
+      }
+    } catch (historyError) {
+      // Log error but don't fail the request - email was already sent
+      console.error('Failed to save email history:', historyError);
+    }
 
     return NextResponse.json({
       success: true,

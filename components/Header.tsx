@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +21,7 @@ interface HeaderProps {
 
 export const Header = ({ initialUser }: HeaderProps) => {
   const [user, setUser] = useState<User | null>(initialUser ?? null);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,6 +61,18 @@ export const Header = ({ initialUser }: HeaderProps) => {
               >
                 Your Matches
               </Link>
+              <Link
+                href="/history"
+                className="text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+              >
+                History
+              </Link>
+              <button
+                onClick={() => setShowPremiumModal(true)}
+                className="text-md font-semibold text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none"
+              >
+                Premium
+              </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 text-white transition-all border border-transparent hover:border-white/30 hover:bg-white/10 hover:rounded-xl hover:px-3 hover:py-1.5 px-3 py-1.5 focus:outline-none">
@@ -105,6 +119,16 @@ export const Header = ({ initialUser }: HeaderProps) => {
           )}
         </div>
       </div>
+
+      {/* Premium Modal */}
+      <UpgradeModal
+        open={showPremiumModal}
+        onOpenChange={setShowPremiumModal}
+        hiddenMatchCount={0}
+        email={user?.email || ''}
+        onDismiss={() => setShowPremiumModal(false)}
+        customTitle="Our Premium Plan"
+      />
     </header>
   );
 };

@@ -4,12 +4,15 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UpgradeButton } from "@/components/UpgradeButton";
+import { Button } from "@/components/ui/button";
 
 interface UpgradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   hiddenMatchCount: number;
   email: string;
+  onDismiss?: () => void;
+  customTitle?: string;
 }
 
 const freeFeatures = [
@@ -26,9 +29,17 @@ const premiumFeatures = [
   "Priority support",
 ];
 
-export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email }: UpgradeModalProps) {
+export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDismiss, customTitle }: UpgradeModalProps) {
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        onOpenChange(nextOpen);
+        if (!nextOpen) {
+          onDismiss?.();
+        }
+      }}
+    >
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content className={cn(
@@ -43,7 +54,7 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email }: Up
             {/* Header */}
             <div className="text-center">
               <DialogPrimitive.Title className="text-2xl font-bold text-white">
-                🔒 {hiddenMatchCount} More Match{hiddenMatchCount === 1 ? '' : 'es'} Available
+                {customTitle || `🔒 ${hiddenMatchCount} More Match${hiddenMatchCount === 1 ? '' : 'es'} Available`}
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="text-white/60 text-sm mt-2">
                 Upgrade to Premium to unlock all your matches and premium features
@@ -71,9 +82,17 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email }: Up
                   ))}
                 </div>
                 <div className="mt-auto">
-                  <div className="w-full py-2.5 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm font-medium text-center">
-                    Current plan
-                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onDismiss?.();
+                    }}
+                    className="w-full py-2.5 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm font-medium text-center hover:bg-green-500/30 transition-colors"
+                  >
+                    Continue with Free
+                  </Button>
                 </div>
               </div>
 
@@ -87,7 +106,7 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email }: Up
                 <div className="text-center mt-3">
                   <h3 className="text-xl font-bold text-white mb-1">Premium</h3>
                   <p className="text-white/60 text-xs mb-3">Unlock all features and unlimited matches</p>
-                  <div className="text-2xl font-bold text-white mb-1">$25</div>
+                  <div className="text-2xl font-bold text-white mb-1">$15</div>
                   <div className="text-white/60 text-xs mb-4">USD / month</div>
                 </div>
                 <div className="flex-1 space-y-2 mb-4">

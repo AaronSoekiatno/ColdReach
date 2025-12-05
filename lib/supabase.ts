@@ -171,49 +171,100 @@ export interface StartupRow {
 
 /**
  * Save or update a startup in Supabase
+ * Ensures no duplicates are created and preserves existing founder data
  * @param startup - Startup data
  */
 export async function saveStartup(startup: StartupRow) {
   const client = supabaseAdmin || supabase;
   
-  // Build the data object, only including fields that are defined
-  // This prevents errors if columns don't exist yet
+  // FIRST: Check if startup already exists in Supabase
+  const { data: existing, error: fetchError } = await client
+    .from('startups')
+    .select('*')
+    .eq('id', startup.id)
+    .single();
+
+  // If there's an error fetching and it's not "not found", throw it
+  if (fetchError && fetchError.code !== 'PGRST116') {
+    throw new Error(`Failed to check existing startup: ${fetchError.message}`);
+  }
+
+  // Build the data object, merging with existing data to preserve founder info
   const dataToInsert: any = {
     id: startup.id,
-    name: startup.name,
-    industry: startup.industry,
-    description: startup.description,
-    funding_stage: startup.funding_stage,
-    funding_amount: startup.funding_amount,
-    location: startup.location,
-    website: startup.website,
-    tags: startup.tags,
-    created_at: startup.created_at || new Date().toISOString(),
+    // Use provided values, or fall back to existing, or use defaults
+    name: startup.name || existing?.name || 'Unknown',
+    industry: startup.industry !== undefined ? startup.industry : (existing?.industry || ''),
+    description: startup.description !== undefined ? startup.description : (existing?.description || ''),
+    funding_stage: startup.funding_stage !== undefined ? startup.funding_stage : (existing?.funding_stage || ''),
+    funding_amount: startup.funding_amount !== undefined ? startup.funding_amount : (existing?.funding_amount || ''),
+    location: startup.location !== undefined ? startup.location : (existing?.location || ''),
+    website: startup.website !== undefined ? startup.website : (existing?.website || ''),
+    tags: startup.tags !== undefined ? startup.tags : (existing?.tags || ''),
+    created_at: startup.created_at || existing?.created_at || new Date().toISOString(),
   };
 
-  // Only add founder fields if they're defined (and columns exist)
+  // Preserve existing founder data if new data isn't explicitly provided
+  // This ensures founder emails are never lost when updating from Pinecone matches
   if (startup.founder_first_name !== undefined) {
     dataToInsert.founder_first_name = startup.founder_first_name || null;
-  }
-  if (startup.founder_last_name !== undefined) {
-    dataToInsert.founder_last_name = startup.founder_last_name || null;
-  }
-  if (startup.founder_emails !== undefined) {
-    dataToInsert.founder_emails = startup.founder_emails || null;
-  }
-  if (startup.founder_linkedin !== undefined) {
-    dataToInsert.founder_linkedin = startup.founder_linkedin || null;
-  }
-  if (startup.batch !== undefined) {
-    dataToInsert.batch = startup.batch || null;
-  }
-  if (startup.job_openings !== undefined) {
-    dataToInsert.job_openings = startup.job_openings || null;
-  }
-  if (startup.date_raised !== undefined) {
-    dataToInsert.date_raised = startup.date_raised || null;
+  } else if (existing?.founder_first_name) {
+    dataToInsert.founder_first_name = existing.founder_first_name;
+  } else {
+    dataToInsert.founder_first_name = null;
   }
   
+  if (startup.founder_last_name !== undefined) {
+    dataToInsert.founder_last_name = startup.founder_last_name || null;
+  } else if (existing?.founder_last_name) {
+    dataToInsert.founder_last_name = existing.founder_last_name;
+  } else {
+    dataToInsert.founder_last_name = null;
+  }
+  
+  if (startup.founder_emails !== undefined) {
+    dataToInsert.founder_emails = startup.founder_emails || null;
+  } else if (existing?.founder_emails) {
+    // ✅ CRITICAL: Preserve existing founder emails if not provided in update
+    dataToInsert.founder_emails = existing.founder_emails;
+  } else {
+    dataToInsert.founder_emails = null;
+  }
+  
+  if (startup.founder_linkedin !== undefined) {
+    dataToInsert.founder_linkedin = startup.founder_linkedin || null;
+  } else if (existing?.founder_linkedin) {
+    dataToInsert.founder_linkedin = existing.founder_linkedin;
+  } else {
+    dataToInsert.founder_linkedin = null;
+  }
+  
+  if (startup.batch !== undefined) {
+    dataToInsert.batch = startup.batch || null;
+  } else if (existing?.batch) {
+    dataToInsert.batch = existing.batch;
+  } else {
+    dataToInsert.batch = null;
+  }
+  
+  if (startup.job_openings !== undefined) {
+    dataToInsert.job_openings = startup.job_openings || null;
+  } else if (existing?.job_openings) {
+    dataToInsert.job_openings = existing.job_openings;
+  } else {
+    dataToInsert.job_openings = null;
+  }
+  
+  if (startup.date_raised !== undefined) {
+    dataToInsert.date_raised = startup.date_raised || null;
+  } else if (existing?.date_raised) {
+    dataToInsert.date_raised = existing.date_raised;
+  } else {
+    dataToInsert.date_raised = null;
+  }
+  
+  // Use upsert with onConflict to ensure only one row per startup ID
+  // This prevents duplicates and updates existing rows
   const { data, error } = await client
     .from('startups')
     .upsert(dataToInsert, {
@@ -259,15 +310,17 @@ export async function getStartup(id: string) {
 }
 
 /**
- * Get a startup by name
+ * Get a startup by name (case-insensitive)
  */
 export async function getStartupByName(name: string) {
   const client = supabaseAdmin || supabase;
   
+  // Use case-insensitive search
   const { data, error } = await client
     .from('startups')
     .select('*')
-    .eq('name', name)
+    .ilike('name', name)
+    .limit(1)
     .single();
 
   if (error) {
@@ -278,6 +331,38 @@ export async function getStartupByName(name: string) {
   }
 
   return data;
+}
+
+/**
+ * Find or get existing startup by name, returning the Supabase startup ID
+ * This ensures we use existing Supabase data instead of creating duplicates
+ * @param name - Startup name (case-insensitive match)
+ * @returns The existing startup ID if found, null otherwise
+ */
+export async function findStartupIdByName(name: string): Promise<string | null> {
+  const client = supabaseAdmin || supabase;
+  
+  if (!name || name.trim() === '') {
+    return null;
+  }
+
+  // Case-insensitive search for existing startup
+  const { data, error } = await client
+    .from('startups')
+    .select('id')
+    .ilike('name', name.trim())
+    .limit(1)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') {
+      return null; // Not found
+    }
+    console.warn(`Error finding startup by name "${name}":`, error.message);
+    return null;
+  }
+
+  return data?.id || null;
 }
 
 // ==================== MATCH FUNCTIONS ====================
