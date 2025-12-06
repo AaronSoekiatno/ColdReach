@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { generateColdEmail } from '@/lib/email-generation';
 import { getCandidate, getStartup } from '@/lib/supabase';
 import { guessFounderEmailFromStartup } from '@/lib/founder-email';
@@ -98,11 +99,32 @@ export async function POST(request: NextRequest) {
       { score: matchScore }
     );
 
+    // Generate signed URL for resume preview
+    let resumeUrl = null;
+    if (candidate.resume_path) {
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (serviceRoleKey) {
+        const supabaseAdmin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          serviceRoleKey
+        );
+
+        const { data } = await supabaseAdmin.storage
+          .from('resumes')
+          .createSignedUrl(candidate.resume_path, 3600); // 1 hour expiry
+
+        if (data?.signedUrl) {
+          resumeUrl = data.signedUrl;
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       subject: generatedEmail.subject,
       body: generatedEmail.body,
       to: targetEmail,
+      resumeUrl,
     });
   } catch (error) {
     console.error('Preview email error:', error);

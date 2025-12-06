@@ -53,8 +53,9 @@ async function extractResumeDataWithGemini(
 }`;
 
   // Try different model names in order of preference
+  // Start with Flash models (faster, cheaper) to avoid rate limits on Pro
   // Using newer Gemini 2.x models as 1.5 models are deprecated
-  const modelNames = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+  const modelNames = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
   let lastError: any = null;
 
   for (const modelName of modelNames) {
