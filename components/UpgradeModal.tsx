@@ -115,8 +115,14 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
                 <div className="text-center mt-3">
                   <h3 className="text-xl font-bold text-white mb-1">Free</h3>
                   <p className="text-white/60 text-xs mb-3">Access to basic matching features</p>
-                  <div className="text-2xl font-bold text-white mb-1">$0</div>
-                  <div className="text-white/60 text-xs mb-4">USD / month</div>
+                  <div className="mb-1">
+                    <span className="text-2xl font-bold text-white">$0</span>
+                    <span className="text-white/60 text-sm ml-1">USD</span>
+                  </div>
+                  <div className="text-white/60 text-xs mb-1">/ month</div>
+                  {!isPremium && (
+                    <div className="text-transparent text-sm font-semibold mb-1 select-none">$0 payment today</div>
+                  )}
                 </div>
                 <div className="flex-1 space-y-2 mb-4">
                   {freeFeatures.map((feature, index) => (
@@ -157,8 +163,14 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
                 <div className="text-center mt-3">
                   <h3 className="text-xl font-bold text-white mb-1">Premium</h3>
                   <p className="text-white/60 text-xs mb-3">Unlock all features and unlimited matches</p>
-                  <div className="text-2xl font-bold text-white mb-1">$15</div>
-                  <div className="text-white/60 text-xs mb-4">USD / month</div>
+                  <div className="mb-1">
+                    <span className={`text-2xl font-bold text-white ${!isPremium ? 'line-through decoration-2' : ''}`}>$15</span>
+                    <span className="text-white/60 text-sm ml-1">USD</span>
+                  </div>
+                  <div className="text-white/60 text-xs mb-1">/ month</div>
+                  {!isPremium && (
+                    <div className="text-white text-sm font-semibold mb-1">$0 payment today</div>
+                  )}
                 </div>
                 <div className="flex-1 space-y-2 mb-4">
                   {premiumFeatures.map((feature, index) => (
@@ -183,7 +195,7 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
                     Current Plan
                   </Button>
                 ) : (
-                  <UpgradeButton email={email} className="w-full text-sm py-2.5 mt-auto" />
+                  <UpgradeButton email={email} className="w-full text-sm py-2.5 mt-auto" showTrialCTA={true} />
                 )}
               </div>
             </div>
