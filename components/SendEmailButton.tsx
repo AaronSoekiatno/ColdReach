@@ -61,8 +61,9 @@ export const SendEmailButton = ({
         throw new Error(data.error || 'Failed to send email');
       }
 
-      setPreviewSubject(data.subject);
-      setPreviewBody(data.body);
+      // Ensure values are always strings (even if empty) so text boxes remain visible
+      setPreviewSubject(data.subject || '');
+      setPreviewBody(data.body || '');
 
       toast({
         title: "Email drafted",
@@ -205,12 +206,12 @@ export const SendEmailButton = ({
           </DialogDescription>
         </DialogHeader>
 
-        {isPreviewLoading && !previewSubject && !previewBody ? (
+        {isPreviewLoading && previewSubject === null && previewBody === null ? (
           <div className="flex flex-col items-center justify-center py-12 space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
             <p className="text-white/70 text-sm">Generating your personalized email...</p>
           </div>
-        ) : previewSubject && previewBody ? (
+        ) : previewSubject !== null && previewBody !== null ? (
           <div className="space-y-4 text-sm">
             <div className="space-y-2">
               <label className="font-semibold text-white block">Subject:</label>
