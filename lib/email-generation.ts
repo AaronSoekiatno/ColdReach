@@ -10,8 +10,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
  * It assumes GEMINI_API_KEY is configured in the environment.
  */
 
-// Default model for higher‑quality, reasoning‑heavy outputs.
-const DEFAULT_EMAIL_MODEL = process.env.GEMINI_EMAIL_MODEL || 'gemini-2.5-pro';
+// Default model - use Flash for speed and to avoid rate limits, but allow override for Pro if needed
+// Flash is sufficient for email generation and helps distribute API load
+const DEFAULT_EMAIL_MODEL = process.env.GEMINI_EMAIL_MODEL || 'gemini-2.5-flash';
 
 // ---------- Types ----------
 

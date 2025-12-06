@@ -126,8 +126,7 @@ export async function upsertStartup(
  */
 export async function findMatchingStartups(
   embedding: number[],
-  topK: number = 10,
-  minScore: number = 0.30
+  topK: number = 1000
 ): Promise<MatchResult[]> {
   const index = getPineconeClient().index(getIndexName());
 
@@ -139,7 +138,6 @@ export async function findMatchingStartups(
 
   return queryResponse.matches
     .filter((match) => match.metadata) // Filter out matches without metadata
-    .filter((match) => (match.score || 0) >= minScore) // Filter by minimum score
     .map((match) => ({
       id: match.id,
       score: match.score || 0,

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ColdStart - Resume Upload",
+  title: "Hermes - Resume Upload",
   description: "Upload your resume to get started",
 };
 

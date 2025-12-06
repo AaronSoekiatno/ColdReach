@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStripe, STRIPE_PRICE_IDS } from '@/lib/stripe';
+import { getStripe, STRIPE_PRICE_IDS, PRODUCT_CONFIG } from '@/lib/stripe';
 import { createServerClient } from '@supabase/ssr';
 import { supabaseAdmin } from '@/lib/supabase';
 
@@ -144,6 +144,9 @@ export async function POST(request: NextRequest) {
           },
         ],
         mode: 'subscription',
+        subscription_data: {
+          trial_period_days: PRODUCT_CONFIG.PREMIUM.trialPeriodDays,
+        },
         success_url: `${request.headers.get('origin')}/matches?success=true`,
         cancel_url: `${request.headers.get('origin')}/matches?canceled=true`,
         metadata: {
@@ -186,6 +189,9 @@ export async function POST(request: NextRequest) {
             },
           ],
           mode: 'subscription',
+          subscription_data: {
+            trial_period_days: PRODUCT_CONFIG.PREMIUM.trialPeriodDays,
+          },
           success_url: `${request.headers.get('origin')}/matches?success=true`,
           cancel_url: `${request.headers.get('origin')}/matches?canceled=true`,
           metadata: {

@@ -44,7 +44,7 @@ export default async function HistoryPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/login?redirect=/history`);
+    redirect(`/?signup=true&redirect=/history`);
   }
 
   if (!supabaseAdmin) {
@@ -157,7 +157,7 @@ export default async function HistoryPage() {
                       </h3>
                       {email.match_score !== null && (
                         <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs font-medium rounded-lg">
-                          {(email.match_score * 100).toFixed(0)}% match
+                          {Math.min((email.match_score * 100) + 40, 97).toFixed(0)}% match
                         </span>
                       )}
                     </div>

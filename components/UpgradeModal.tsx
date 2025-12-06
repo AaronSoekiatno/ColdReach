@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UpgradeButton } from "@/components/UpgradeButton";
 import { Button } from "@/components/ui/button";
+import { isSubscribed } from "@/lib/supabase";
 
 interface UpgradeModalProps {
   open: boolean;
@@ -13,6 +15,7 @@ interface UpgradeModalProps {
   email: string;
   onDismiss?: () => void;
   customTitle?: string;
+  isPremium?: boolean; // Whether the user currently has premium subscription
 }
 
 const freeFeatures = [
@@ -29,7 +32,51 @@ const premiumFeatures = [
   "Priority support",
 ];
 
-export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDismiss, customTitle }: UpgradeModalProps) {
+export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDismiss, customTitle, isPremium: initialIsPremium = false }: UpgradeModalProps) {
+  const [isPremium, setIsPremium] = useState(initialIsPremium);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Refresh premium status when modal opens
+  useEffect(() => {
+    if (open && email) {
+      const refreshPremiumStatus = async () => {
+        setIsRefreshing(true);
+        try {
+          // Sync subscription first
+          await fetch('/api/stripe/sync-subscription', {
+            method: 'POST',
+            credentials: 'include',
+          });
+          
+          // Then fetch updated candidate info
+          const response = await fetch('/api/candidate-info', {
+            credentials: 'include',
+            cache: 'no-store',
+          });
+          
+          if (response.ok) {
+            const candidateInfo = await response.json();
+            console.log('UpgradeModal - Refreshed candidate info:', candidateInfo);
+            setIsPremium(isSubscribed(candidateInfo));
+          }
+        } catch (error) {
+          console.error('Error refreshing premium status:', error);
+        } finally {
+          setIsRefreshing(false);
+        }
+      };
+      
+      refreshPremiumStatus();
+    } else {
+      setIsPremium(initialIsPremium);
+    }
+  }, [open, email, initialIsPremium]);
+
+  // Log premium status for debugging
+  if (open) {
+    console.log('UpgradeModal opened - isPremium:', isPremium, 'email:', email, 'isRefreshing:', isRefreshing);
+  }
+  
   return (
     <DialogPrimitive.Root
       open={open}
@@ -46,7 +93,7 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
           "fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] gap-4 bg-black border border-white/20 p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-3xl text-white"
         )}>
           <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none text-white hover:text-white">
-            <X className="h-4 w-4" />
+            <X className="h-6 w-6" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
 
@@ -68,8 +115,14 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
                 <div className="text-center mt-3">
                   <h3 className="text-xl font-bold text-white mb-1">Free</h3>
                   <p className="text-white/60 text-xs mb-3">Access to basic matching features</p>
-                  <div className="text-2xl font-bold text-white mb-1">$0</div>
-                  <div className="text-white/60 text-xs mb-4">USD / month</div>
+                  <div className="mb-1">
+                    <span className="text-2xl font-bold text-white">$0</span>
+                    <span className="text-white/60 text-sm ml-1">USD</span>
+                  </div>
+                  <div className="text-white/60 text-xs mb-1">/ month</div>
+                  {!isPremium && (
+                    <div className="text-transparent text-sm font-semibold mb-1 select-none">$0 payment today</div>
+                  )}
                 </div>
                 <div className="flex-1 space-y-2 mb-4">
                   {freeFeatures.map((feature, index) => (
@@ -89,7 +142,7 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
                       onOpenChange(false);
                       onDismiss?.();
                     }}
-                    className="w-full py-2.5 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm font-medium text-center hover:bg-green-500/30 transition-colors"
+                    className="w-full py-2.5 border border-blue-500/30 rounded-lg text-blue-400 text-sm font-medium text-center hover:bg-white/5 transition-colors"
                   >
                     Continue with Free
                   </Button>
@@ -99,15 +152,25 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
               {/* Premium Plan Card */}
               <div className="border-2 border-blue-500 rounded-xl p-4 flex flex-col relative bg-gradient-to-br from-blue-900/30 to-indigo-900/30">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                  <div className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                    Best for students ✨
+                  <div className={`text-white px-3 py-1 rounded-full text-xs font-semibold ${
+                    isPremium 
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500' 
+                      : 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                  }`}>
+                    {'Best for students ✨'}
                   </div>
                 </div>
                 <div className="text-center mt-3">
                   <h3 className="text-xl font-bold text-white mb-1">Premium</h3>
                   <p className="text-white/60 text-xs mb-3">Unlock all features and unlimited matches</p>
-                  <div className="text-2xl font-bold text-white mb-1">$15</div>
-                  <div className="text-white/60 text-xs mb-4">USD / month</div>
+                  <div className="mb-1">
+                    <span className={`text-2xl font-bold text-white ${!isPremium ? 'line-through decoration-2' : ''}`}>$15</span>
+                    <span className="text-white/60 text-sm ml-1">USD</span>
+                  </div>
+                  <div className="text-white/60 text-xs mb-1">/ month</div>
+                  {!isPremium && (
+                    <div className="text-white text-sm font-semibold mb-1">$0 payment today</div>
+                  )}
                 </div>
                 <div className="flex-1 space-y-2 mb-4">
                   {premiumFeatures.map((feature, index) => (
@@ -119,7 +182,21 @@ export function UpgradeModal({ open, onOpenChange, hiddenMatchCount, email, onDi
                     </div>
                   ))}
                 </div>
-                <UpgradeButton email={email} className="w-full text-sm py-2.5 mt-auto" />
+                {isPremium ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      onOpenChange(false);
+                      onDismiss?.();
+                    }}
+                    className="w-full py-2.5 bg-blue-500/20 border border-blue-500/30 rounded-lg text-blue-400 text-sm font-medium text-center hover:bg-blue-500/10 transition-colors mt-auto"
+                  >
+                    Current Plan
+                  </Button>
+                ) : (
+                  <UpgradeButton email={email} className="w-full text-sm py-2.5 mt-auto" showTrialCTA={true} />
+                )}
               </div>
             </div>
           </div>

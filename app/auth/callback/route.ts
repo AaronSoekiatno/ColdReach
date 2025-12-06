@@ -59,10 +59,13 @@ export async function GET(request: NextRequest) {
       isNewSignUp = !candidate;
     }
 
-    // Redirect to home page after successful authentication
+    // Check for redirect parameter
+    const redirectTo = requestUrl.searchParams.get('redirect');
+    
+    // Redirect to specified URL or home page after successful authentication
     // Add new_signup parameter to trigger Gmail connection modal
-    const redirectUrl = new URL('/', origin);
-    if (isNewSignUp) {
+    const redirectUrl = new URL(redirectTo || '/', origin);
+    if (isNewSignUp && !redirectTo) {
       redirectUrl.searchParams.set('new_signup', 'true');
     }
     return NextResponse.redirect(redirectUrl);
@@ -86,8 +89,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/?error=auth_failed', origin));
     }
 
-    // Redirect to home page after successful authentication
-    return NextResponse.redirect(new URL('/', origin));
+    // Check for redirect parameter
+    const redirectTo = requestUrl.searchParams.get('redirect');
+    
+    // Redirect to specified URL or home page after successful authentication
+    return NextResponse.redirect(new URL(redirectTo || '/', origin));
   }
 
   // Check for hash fragments (password reset links use hash fragments)

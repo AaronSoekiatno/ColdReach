@@ -53,8 +53,9 @@ async function extractResumeDataWithGemini(
 }`;
 
   // Try different model names in order of preference
+  // Start with Flash models (faster, cheaper) to avoid rate limits on Pro
   // Using newer Gemini 2.x models as 1.5 models are deprecated
-  const modelNames = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+  const modelNames = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
   let lastError: any = null;
 
   for (const modelName of modelNames) {
@@ -567,58 +568,22 @@ export async function POST(request: NextRequest) {
       console.log('User not authenticated - skipping database save. Results will be returned for preview.');
     }
 
-    // Find matching startups with quality threshold
-    // minScore = 0.45 (45%) - filters out very weak matches
-    // For free users, we find all matches but only save the top 1
+    // Find matching startups - no minimum score threshold, show all matches
+    // Matches are ordered by score descending (highest to lowest)
     let matches: Array<{ id: string; score: number; metadata: any }> = [];
     let matchingError: string | undefined;
     try {
-      const MIN_MATCH_SCORE = 0.45; // Only show matches above 45% similarity
-      const isPremium = isSubscribed({ subscription_tier: subscriptionTier, subscription_status: subscriptionStatus });
-      const maxMatches = isPremium ? 10 : 10; // Find 10 matches but will only save 1 for free users
-      matches = await findMatchingStartups(embedding, maxMatches, MIN_MATCH_SCORE);
-
-      console.log(`\n${'='.repeat(80)}`);
-      console.log(`FOUND ${matches.length} QUALITY MATCHES (>${(MIN_MATCH_SCORE * 100).toFixed(0)}% similarity)`);
-      console.log('='.repeat(80));
-
-      // Categorize match quality with adjusted thresholds
-      const excellent = matches.filter(m => m.score >= 0.70);
-      const good = matches.filter(m => m.score >= 0.50 && m.score < 0.70);
-      const moderate = matches.filter(m => m.score >= 0.30 && m.score < 0.50);
-
-      console.log(`\nMatch Quality Breakdown:`);
-      console.log(`  🟢 Excellent (70-100%): ${excellent.length}`);
-      console.log(`  🟡 Good (50-70%): ${good.length}`);
-      console.log(`  🟠 Moderate (30-50%): ${moderate.length}`);
-
-      // Log each match with details and quality indicator
-      matches.forEach((match, index) => {
-        const scorePercent = match.score * 100;
-        let quality = '🔴 Weak';
-        if (match.score >= 0.70) quality = '🟢 Excellent';
-        else if (match.score >= 0.50) quality = '🟡 Good';
-        else if (match.score >= 0.30) quality = '🟠 Moderate';
-
-        console.log(`\n--- Match #${index + 1} [${quality}] ---`);
-        console.log(`Startup ID: ${match.id}`);
-        console.log(`Match Score: ${scorePercent.toFixed(2)}%`);
-        console.log(`Name: ${match.metadata?.name || 'N/A'}`);
-        console.log(`Industry: ${match.metadata?.industry || 'N/A'}`);
-        console.log(`Location: ${match.metadata?.location || 'N/A'}`);
-        console.log(`Funding Stage: ${match.metadata?.funding_stage || 'N/A'}`);
-        console.log(`Website: ${match.metadata?.website || 'N/A'}`);
-        console.log(`Full Metadata:`, JSON.stringify(match.metadata, null, 2));
-      });
-
-      console.log(`\n${'='.repeat(80)}\n`);
+      // Find all matches - no minimum score threshold
+      // Pinecone serverless free tier: max 100, paid tiers: up to 10000
+      // Using 10000 to get all matches (will be limited by plan if needed)
+      const maxMatches = 10000;
+      matches = await findMatchingStartups(embedding, maxMatches);
 
       // Save matches to Supabase - only if authenticated and we have a candidate ID
       if (matches.length > 0 && isAuthenticated && candidateId) {
         try {
           // Map Pinecone matches to Supabase startup IDs
           // This ensures we use existing Supabase data (with founder emails) instead of creating duplicates
-          console.log(`Mapping ${matches.length} matched startups to Supabase IDs...`);
           const matchMappings: Array<{ startup_id: string; score: number }> = [];
 
           for (const match of matches) {
@@ -631,7 +596,6 @@ export async function POST(request: NextRequest) {
 
               if (supabaseStartupId) {
                 // Startup exists in Supabase - use that ID
-                console.log(`  ✓ Found existing startup "${startupName}" in Supabase (ID: ${supabaseStartupId})`);
                 matchMappings.push({
                   startup_id: supabaseStartupId,
                   score: match.score,
@@ -639,7 +603,6 @@ export async function POST(request: NextRequest) {
               } else {
                 // Startup doesn't exist in Supabase - create it using Pinecone data
                 // This should rarely happen if all startups were ingested from CSV
-                console.log(`  ⚠ Startup "${startupName}" not found in Supabase, creating new entry...`);
                 await saveStartup({
                   id: match.id, // Use Pinecone ID for new startups
                   name: startupName,
@@ -669,14 +632,6 @@ export async function POST(request: NextRequest) {
           await saveMatches(
             candidateId, // Use UUID instead of email
             matchMappings
-          );
-          const isPremium = isSubscribed({ subscription_tier: subscriptionTier, subscription_status: subscriptionStatus });
-          console.log(
-            `✓ Successfully saved ${matches.length} matches to Supabase for candidate ${candidateId}${
-              isPremium
-                ? ''
-                : ' (Free tier - UI will show 1 match, additional matches are locked behind Premium)'
-            }`
           );
         } catch (error) {
           console.error('✗ Failed to save matches to Supabase:', {

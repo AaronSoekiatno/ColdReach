@@ -47,6 +47,7 @@ export const PRODUCT_CONFIG = {
     price: 10.00, // $10/month
     currency: 'usd',
     interval: 'month' as const,
+    trialPeriodDays: 7, // 7-day free trial
     features: [
       'Unlimited startup matches',
       'AI-powered resume tailoring',

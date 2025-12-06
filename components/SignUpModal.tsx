@@ -18,9 +18,10 @@ interface SignUpModalProps {
   onOpenChange: (open: boolean) => void;
   fromReview?: boolean;
   onSwitchToSignIn?: () => void;
+  redirectTo?: string;
 }
 
-export const SignUpModal = ({ open, onOpenChange, fromReview = false, onSwitchToSignIn }: SignUpModalProps) => {
+export const SignUpModal = ({ open, onOpenChange, fromReview = false, onSwitchToSignIn, redirectTo }: SignUpModalProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -29,10 +30,14 @@ export const SignUpModal = ({ open, onOpenChange, fromReview = false, onSwitchTo
   const handleGoogleSignUp = async () => {
     try {
       setIsLoading(true);
+      const redirectUrl = redirectTo 
+        ? `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`
+        : `${window.location.origin}/auth/callback`;
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
           queryParams: {
             prompt: 'select_account', // Force account picker to show every time
           },
@@ -88,11 +93,15 @@ export const SignUpModal = ({ open, onOpenChange, fromReview = false, onSwitchTo
     try {
       setIsLoading(true);
       // Use signUp with email and password
+      const redirectUrl = redirectTo 
+        ? `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`
+        : `${window.location.origin}/auth/callback`;
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: redirectUrl,
         },
       });
 

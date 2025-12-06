@@ -128,6 +128,7 @@ export const Hero = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [matchedStartups, setMatchedStartups] = useState<string[]>([]);
   const [matchCount, setMatchCount] = useState<number>(0);
+  const [perfectFitCount, setPerfectFitCount] = useState<number>(0);
   const [pendingResumeData, setPendingResumeData] = useState<any>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -277,11 +278,18 @@ export const Hero = () => {
           });
         }
       }
+
+      // Check if user was redirected here to sign up
+      if (urlParams.get('signup') === 'true' && !currentUser) {
+        setIsSignUpModalOpen(true);
+      }
       
-      // Clean up URL if we came from auth callback
-      if (isAuthCallback || urlParams.has('gmail_connected') || urlParams.has('error')) {
+      // Clean up URL if we came from auth callback or signup redirect
+      if (isAuthCallback || urlParams.has('gmail_connected') || urlParams.has('error') || urlParams.has('signup')) {
         // Remove query params and hash
-        window.history.replaceState({}, '', window.location.pathname);
+        const redirectTo = urlParams.get('redirect');
+        const cleanPath = redirectTo ? redirectTo : window.location.pathname;
+        window.history.replaceState({}, '', cleanPath);
       }
     };
     void initializeAuth();
@@ -312,27 +320,35 @@ export const Hero = () => {
         // If same user, keep hasCheckedGmail as is to prevent duplicate checks
       }
 
-      // If user just signed in and we have pending resume data, save it
-      if (
-        event === 'SIGNED_IN' &&
-        newUser &&
-        pendingResumeData &&
-        !pendingResumeData.savedToDatabase &&
-        uploadedFile &&
-        !reuploadInProgress.current
-      ) {
-        setShowSavingModal(true);
-        reuploadPendingResume({ silent: true }).then((success) => {
-          if (success) {
-            // Navigate to matches page after successful save
-            setTimeout(() => {
+      // If user just signed in, handle redirects
+      if (event === 'SIGNED_IN' && newUser) {
+        // Check for redirect parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectTo = urlParams.get('redirect');
+        
+        // If user just signed in and we have pending resume data, save it
+        if (
+          pendingResumeData &&
+          !pendingResumeData.savedToDatabase &&
+          uploadedFile &&
+          !reuploadInProgress.current
+        ) {
+          setShowSavingModal(true);
+          reuploadPendingResume({ silent: true }).then((success) => {
+            if (success) {
+              // Navigate to redirect URL or matches page after successful save
+              setTimeout(() => {
+                setShowSavingModal(false);
+                router.push(redirectTo || '/matches');
+              }, 500);
+            } else {
               setShowSavingModal(false);
-              router.push('/matches');
-            }, 500);
-          } else {
-            setShowSavingModal(false);
-          }
-        });
+            }
+          });
+        } else if (redirectTo) {
+          // No pending resume, just redirect
+          router.push(redirectTo);
+        }
       }
 
       // If user signed out, reset Gmail connection state
@@ -430,7 +446,10 @@ export const Hero = () => {
       const data = await response.json();
       const matches = data.matches || [];
       const count = matches.length;
+      const perfectFitMatches = matches.filter((match: any) => match.score >= 0.5);
+      const perfectFitCount = perfectFitMatches.length;
       setMatchCount(count);
+      setPerfectFitCount(perfectFitCount);
       setMatchedStartups(simulateMatches());
 
       const resumePayload = {
@@ -895,6 +914,7 @@ export const Hero = () => {
           onOpenChange={setIsSignUpModalOpen}
           fromReview={pendingResumeData !== null && !pendingResumeData.savedToDatabase}
           onSwitchToSignIn={() => setIsSignInModalOpen(true)}
+          redirectTo={typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('redirect') || undefined : undefined}
         />
 
       {/* Content */}
@@ -1091,11 +1111,11 @@ export const Hero = () => {
           <div className="bg-white/5 rounded-2xl p-4 space-y-2 text-left">
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
-              <span className="text-sm text-white">{matchCount} perfect-fit startup{matchCount !== 1 ? 's' : ''} matched</span>
+              <span className="text-sm text-white">{perfectFitCount} Perfect fit startup{perfectFitCount !== 1 ? 's' : ''}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-xs">✓</div>
-              <span className="text-sm text-white">Personalized cold DMs ready to send</span>
+              <span className="text-sm text-white">Personalized cold DMs ready</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-xs">→</div>
